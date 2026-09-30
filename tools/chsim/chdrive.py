@@ -11,6 +11,7 @@ src/debug/Debug.h), so one script produces comparable screenshots from each.
 Script lines (# comments allowed):
     wait N              advance N frames
     free SECONDS        run free (real time) for a while, then lockstep again
+    freegif NAME SECONDS EVERY   the same, sampled into a GIF
     tap BTN[+BTN] [H]   hold for H frames (default 3), then release, then 1 frame
     hold BTN[+BTN]      keep held until `release`
     release
@@ -221,6 +222,19 @@ class Driver:
                 self.cmd("L0")
                 time.sleep(float(args[0]))
                 self.cmd("L1")
+            elif op == "freegif":
+                # Free-running (real time, as on the board: the CPU thinks in
+                # bursts) for SECONDS, a shot every EVERY seconds into a GIF.
+                # A shot waits for the game's next frame.
+                name, secs, every = args[0], float(args[1]), float(args[2])
+                self.cmd("L0")
+                frames, t0 = [], time.time()
+                while time.time() - t0 < secs:
+                    frames.append(to_image(self.shot(), 2))
+                    time.sleep(every)
+                self.cmd("L1")
+                frames[0].save(outdir / f"{name}.gif", save_all=True, append_images=frames[1:],
+                               duration=int(1000 * every), loop=0)
             elif op == "step":
                 # One frame at a time, as the free-running game does (N k runs
                 # up to three logic ticks per drawn frame, like a slow frame's

@@ -59,3 +59,19 @@ wait 150
 snap cpu_in_check
 wait 200
 snap cpu_answered
+# Mate waits for a press too, then the result.
+say X r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq -
+wait 12
+say M 39 53
+wait 300
+snap mate_wait
+wait 300
+snap mate_still
+tap A
+wait 30
+snap mate_result
+# The CPU's turn: its glove goes home before it thinks.
+say G 0 0 0 1
+wait 90
+say M 12 28
+gif cpu_turn 150 2

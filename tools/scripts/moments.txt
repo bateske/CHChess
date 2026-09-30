@@ -34,5 +34,7 @@ say X r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq -
 wait 12
 say M 39 53
 gif mate 120 3
-wait 60
+snap mate_waiting
+tap A
+wait 20
 snap result

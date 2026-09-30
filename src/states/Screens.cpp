@@ -73,7 +73,7 @@ static void enter(Scr s) {
         // drifting over it.
         match::Setup demo = {match::TWO_PLAYER, 0, 0, 1};
         match::start(demo);
-        stage::update(false);
+        stage::update();
         stage::setView(stage::NORMAL);
         stage::setZoom(10);
         audio::sfx(Sfx::Title);
@@ -397,14 +397,15 @@ static void playInput() {
     }
 }
 
+static const uint8_t PROMO_TO[4] = {eng::QUEEN, eng::ROOK, eng::BISHOP, eng::KNIGHT};
+
 static void promoInput() {
     if (arduboy.repeat(LEFT_BUTTON) || arduboy.repeat(UP_BUTTON)) { promoSel = (uint8_t)((promoSel + 3) & 3); audio::sfx(Sfx::Flip); }
     if (arduboy.repeat(RIGHT_BUTTON) || arduboy.repeat(DOWN_BUTTON)) { promoSel = (uint8_t)((promoSel + 1) & 3); audio::sfx(Sfx::Flip); }
     if (arduboy.justPressed(B_BUTTON)) { overlay = NONE; audio::sfx(Sfx::Cursor); }
     if (arduboy.justPressed(A_BUTTON)) {
-        static const uint8_t P[4] = {eng::QUEEN, eng::ROOK, eng::BISHOP, eng::KNIGHT};
         overlay = NONE;
-        if (match::play(promoFrom, promoTo, P[promoSel])) stage::deselect();
+        if (match::play(promoFrom, promoTo, PROMO_TO[promoSel])) stage::deselect();
     }
 }
 
@@ -458,7 +459,7 @@ static void playUpdate(bool thinking) {
         else if (arduboy.justPressed(START_BUTTON) && !bHeld) { overlay = PAUSE; sel = 0; audio::sfx(Sfx::Select); }
         if (overlay == NONE) lookAround();
         if (arduboy.justPressed(SELECT_BUTTON) && !bHeld) cycleView();
-        stage::update(true);
+        stage::update();
         return;
     }
     if (pendingAction) { uint8_t a = pendingAction; pendingAction = 0; doAction(a); }
@@ -478,7 +479,7 @@ static void playUpdate(bool thinking) {
             break;
         default:
             lookAround();
-            if (stage::checkShown()) {
+            if (stage::waiting()) {
                 if (arduboy.justPressedMask()) { stage::acknowledge(); audio::sfx(Sfx::Select); }
                 break;
             }
@@ -494,7 +495,7 @@ static void playUpdate(bool thinking) {
 #if CHCH_DEBUG
     if (millis() - t0 > 100) thinkMs = millis() - t0;
 #endif
-    stage::update(false);
+    stage::update();
     if (!match::active() && stage::overShown() && overlay != RESULT) {
         countResult();
         overlay = RESULT;
@@ -524,14 +525,12 @@ static void playRender(uint32_t frame) {
         // A slot-machine reel of the four pieces; the pawn becomes the one showing.
         panel(26, 76);
         centred35(30, "PROMOTE TO", GOLD);
-        static const uint8_t P[4] = {eng::QUEEN, eng::ROOK, eng::BISHOP, eng::KNIGHT};
-        static const char *const N[4] = {"QUEEN", "ROOK", "BISHOP", "KNIGHT"};
         uint8_t colour = match::blackToMove() ? eng::BLACK : 0;
         gfx_fillRect(44, 38, 40, 52, INK);
         gfx_rect(43, 37, 42, 54, GOLD);
-        stage::drawPieceAt((uint8_t)(P[promoSel] | colour), 64, 82);
+        stage::drawPieceAt((uint8_t)(PROMO_TO[promoSel] | colour), 64, 82);
         arrows(59, 42, true, frame);
-        centred35(94, N[promoSel], WHITE);
+        centred35(94, stage::NAMES[PROMO_TO[promoSel]], WHITE);
     } else if (overlay == RESULT) {
         panel(84, 40);
         const char *head, *why = "";
@@ -711,7 +710,7 @@ static bool debugHook(char cmd, const char *args) {
 // profile and the think report never touch the game, so they run at once.
 static bool searching(char cmd) {
     if (cmd == 'Y' || cmd == 'W') return false;
-    if (stage::checkShown()) stage::acknowledge();        // a scripted command answers CHECK! as a press would
+    if (stage::waiting()) stage::acknowledge();           // a scripted command answers CHECK! as a press would
     return match::cpuThinking() || (cur == Scr::Play && match::active() && !match::humanToMove());
 }
 #endif

@@ -64,10 +64,6 @@ bool particles() {
     return false;
 }
 
-void scroll(int dx, int dy) {
-    for (auto &p : parts) { p.x = (int16_t)(p.x + dx * 16); p.y = (int16_t)(p.y + dy * 16); }
-}
-
 void spawn(Kind k, int x, int y, int vx, int vy, uint8_t life, uint8_t colour) {
     Particle *slot = nullptr;
     for (auto &p : parts) if (!p.life) { slot = &p; break; }
@@ -93,11 +89,6 @@ void fountain(int x, int y, uint8_t n) {
     for (uint8_t i = 0; i < n; i++)
         spawn(CONFETTI, x + rndRange(-4, 5), y, rndRange(-28, 29), rndRange(-60, -30), (uint8_t)rndRange(40, 70),
               CONF[rnd() % 6]);
-}
-
-bool particlesAlive() {
-    for (auto &p : parts) if (p.life) return true;
-    return false;
 }
 
 static void updateParticles() {

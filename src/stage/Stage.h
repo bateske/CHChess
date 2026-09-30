@@ -10,7 +10,7 @@
 namespace stage {
 
 void begin();
-void update(bool thinking);          // drain match events, advance motion (once per tick)
+void update();                       // drain match events, advance motion (once per tick)
 bool busy();
 bool overShown();                    // the end of the game has been shown
 // Draws the play scene; false if nothing changed since the last frame (the
@@ -26,7 +26,7 @@ bool flipped();                      // viewing from Black's side
 void select(uint8_t sq, const uint8_t *to, const uint8_t *cap, uint8_t n);
 void deselect();
 uint8_t selected();                  // 0xFF: none
-bool checkShown();                   // CHECK! against the player, waiting for a button
+bool waiting();                      // CHECK! against the player, or CHECKMATE!, waiting for a button
 void acknowledge();                  // ... pressed
 void setBlocked(bool b);             // the piece under the glove has no move (the plate says so)
 // Views: the iso board and the flat map. The iso camera whips in close on
@@ -43,6 +43,7 @@ void setHints(bool on);              // show the legal moves of a selected piece
 void setCoords(bool on);             // file/rank letters on the rim
 void setFast(bool on);               // quicker CPU turns and moves
 extern const char *opponentName;     // the HUD's name for the CPU
+extern const char *const NAMES[7];   // the pieces by eng type: "", "PAWN" .. "KING"
 
 // The board and pieces only (the title screen's backdrop), and one piece
 // anywhere on screen (the promotion reel).

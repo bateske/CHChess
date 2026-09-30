@@ -58,11 +58,11 @@ static int8_t topDir;
 // The CPU's pointing finger and the player's; one shows at a time.
 static int32_t fx16, fy16;           // finger tip, world, Q4
 static uint8_t fingerSq = 0xFF;
-static uint8_t thinkT, pickT, tapT;
+static uint8_t pickT, tapT;
 static bool picking;
 
 static uint8_t holdT;                // frames the stage keeps the game waiting
-static bool checkWait;               // CHECK! against you stays up until a button
+static bool waitPress;               // CHECK! against you, or CHECKMATE!, stays up until a button
 // 2P hand-over: the camera whips to the board's centre, the view turns
 // round behind a quick dip to dark, then it swoops onto the new side.
 static uint8_t handT;
@@ -145,10 +145,8 @@ static void stepCamera() {
     cx16 += dx >> aimShift; cy16 += dy >> aimShift;
     if (dx > -16 && dx < 16) cx16 = aimX << 4;
     if (dy > -16 && dy < 16) cy16 = aimY << 4;
-    int ox = cam.x, oy = cam.y;
     cam.x = (int)(cx16 >> 4);
     cam.y = (int)(cy16 >> 4);
-    fx::scroll(ox - cam.x, oy - cam.y);          // particles stay where they are on the board
 }
 
 // Height of the piece on a square (finger tip rests just above it).
@@ -231,7 +229,7 @@ void deselect() {
 }
 
 bool busy() {
-    return mv[0].on || mv[1].on || fly.on || holdT || picking || topT || handT || outWait || checkWait ||
+    return mv[0].on || mv[1].on || fly.on || holdT || picking || topT || handT || outWait || waitPress || fx::particles() ||
            (tileH != zoomTo && !flat);
 }
 bool overShown() { return overDone; }
@@ -241,7 +239,7 @@ bool overShown() { return overDone; }
 // ---------------------------------------------------------------------------
 static void resetFromBoard() {
     memcpy(shown, match::board, 64);
-    holdT = 0; picking = false; thinking = false; tapT = 0; checkWait = false;
+    holdT = 0; picking = false; thinking = false; tapT = 0; waitPress = false;
     fx::clear();
     mv[0].on = mv[1].on = 0;
     fly.on = 0;
@@ -272,7 +270,15 @@ static void onTurn(bool black, bool human) {
     humanTurn = human;
     turnBlack = black;
     intent = 0xFF;
-    if (!human) return;
+    if (!human) {
+        // The CPU's glove goes over to its king, the camera after it, before
+        // it starts thinking (the game waits for holdT).
+        thinking = true;
+        holdT = 24;
+        uint8_t k = (uint8_t)(eng::KING | (black ? eng::BLACK : 0));
+        for (uint8_t s = 0; s < 64; s++) if (shown[s] == k) fingerSq = s;
+        return;
+    }
     if (match::setup.mode == match::TWO_PLAYER) {
         // Hand the board to the other player.
         if (cam.flip) curB = cur; else curW = cur;
@@ -290,13 +296,6 @@ static void onTurn(bool black, bool human) {
     fingerSq = cur;
 }
 
-static void onThink() {
-    thinking = true;
-    thinkT = 0;
-    // Start from the CPU's king.
-    uint8_t k = (uint8_t)(eng::KING | (match::blackToMove() ? eng::BLACK : 0));
-    for (uint8_t s = 0; s < 64; s++) if (shown[s] == k) fingerSq = s;
-}
 
 static void onPick(uint8_t from, uint8_t to) {
     thinking = false;
@@ -341,7 +340,7 @@ static void onMove(const match::Event &e) {
     }
 }
 
-static const char *const NAMES[7] = {"", "PAWN", "KNIGHT", "BISHOP", "ROOK", "QUEEN", "KING"};
+const char *const NAMES[7] = {"", "PAWN", "KNIGHT", "BISHOP", "ROOK", "QUEEN", "KING"};
 
 static void addWord(const char *w, uint8_t c) { if (annN < 7) { annW[annN] = w; annC[annN++] = c; } }
 
@@ -424,14 +423,14 @@ static void onCheck(uint8_t king) {
     audio::sfx(Sfx::Check);
     audio::led(audio::LED_TRIPLE);
     holdT = 40;
-    checkWait = match::setup.mode == match::TWO_PLAYER ||
+    waitPress = match::setup.mode == match::TWO_PLAYER ||
                 ((shown[king] & eng::BLACK) != 0) == (match::setup.humanBlack != 0);
-    fx::holdBanner(checkWait);
+    fx::holdBanner(waitPress);
 }
 
-bool checkShown() { return checkWait; }
+bool waiting() { return waitPress; }
 void acknowledge() {
-    checkWait = false;
+    waitPress = false;
     fx::holdBanner(false);
 }
 
@@ -448,6 +447,8 @@ static void onOver(uint8_t result, uint8_t reason) {
         if (!flat) zoomTo = 10;
         topDir = (int8_t)(fx::rnd() & 1 ? 1 : -1);
         fx::banner("CHECKMATE!", fx::B_RAINBOW, 34, 170);
+        fx::holdBanner(waitPress = true);
+        holdT = 80;                                  // PRESS A once the king is down
     } else if (decisive) {
         fx::banner(result == match::WHITE_WINS ? "BLACK RESIGNS" : "WHITE RESIGNS", fx::B_WHITE, 36, 150);
     } else {
@@ -494,7 +495,7 @@ static void moverPos(const Mover &m, int &x, int &y, int &z) {
     else z = m.t < 4 ? m.t * arc / 4 : (m.T - m.t < 4 ? (m.T - m.t) * arc / 4 : arc);
 }
 
-void update(bool think) {
+void update() {
     match::Event e;
     // A new position (new game, undo, a restored game) cuts in on anything
     // still showing; everything else waits its turn.
@@ -503,7 +504,6 @@ void update(bool think) {
         switch (e.type) {
             case match::EV_START: onStart(); break;
             case match::EV_TURN:  onTurn(e.a != 0, e.b != 0); break;
-            case match::EV_THINK: onThink(); break;
             case match::EV_PICK:  onPick(e.a, e.b); break;
             case match::EV_MOVE:  onMove(e); break;
             case match::EV_CHECK: onCheck(e.a); break;
@@ -524,7 +524,7 @@ void update(bool think) {
     // The glove's piece: its outline fades black/white (HOVER); holding one,
     // the squares shimmer (TARGETS).
     pal::setMode(sel != 0xFF ? pal::TARGETS : humanTurn ? pal::HOVER : pal::CASINO);
-    if (annT && (!checkWait || annT < 40) && ++annT > ANN_FRAMES) annT = 0;
+    if (annT && (!waitPress || annT < 40) && ++annT > ANN_FRAMES) annT = 0;
     for (int k = 0; k < 2; k++) {
         Mover &m = mv[k];
         if (!m.on) continue;
@@ -565,16 +565,14 @@ void update(bool think) {
         aimAt(x, y + zoomed(8), 3);          // the fallen king above the result panel
     } else if (tileH > zoomTo && !flat) {
         aimSq(pending.b, 2);                 // pulling back from the move
-    } else if (think || picking) {
-        if (think) thinkT = (uint8_t)(thinkT < 255 ? thinkT + 1 : 255);
+    } else if (thinking || picking) {
         aimSq(fingerSq, 3);
     } else if (humanTurn) {
         aimSq(cur, 2);
     }
     if (picking) {
         pickT++;
-        uint8_t need = (uint8_t)(fast ? 8 : (thinkT < 36 ? 56 - thinkT : 20));
-        if (pickT >= need && !tapT) { tapT = 1; audio::sfx(Sfx::Select); }
+        if (pickT >= (fast ? 8 : 24) && !tapT) { tapT = 1; audio::sfx(Sfx::Select); }
         if (tapT && ++tapT > 12) { picking = false; tapT = 0; }
     }
     if (handT) {
@@ -607,7 +605,8 @@ void update(bool think) {
         fy16 += ((y << 4) - fy16) >> 1;
     }
 
-    if (over && overT < 255 && ++overT > 150) overDone = true;
+    if (over && overT < 255) overT++;
+    if (overT > 150 && !waitPress) overDone = true;
 }
 
 // ---------------------------------------------------------------------------
@@ -793,10 +792,10 @@ static void drawHud(uint32_t frame) {
         else if (sel != 0xFF) { w[1] = " TO "; c[1] = SILVER; }
         plate(w, c, 4, py, 256, 99);
     }
-    if (checkWait && holdT < 20) {
+    if (waitPress && holdT < 20 && (frame & 32)) {           // blinking
         static const char *const PRESS[1] = {"PRESS A"};
-        uint8_t c = (frame & 16) ? WHITE : GOLD;
-        plate(PRESS, &c, 1, 52, 256, 99);
+        static const uint8_t WHITE1[1] = {WHITE};
+        plate(PRESS, WHITE1, 1, over ? 100 : 52, 256, 99);
     }
 }
 
@@ -822,7 +821,7 @@ static uint32_t signature(uint32_t frame, uint32_t ui) {
     uint32_t v[] = {
         (uint32_t)cam.x, (uint32_t)cam.y, cam.flip, cur, sel, viewMode, tileH, intent, humanTurn, thinking,
         picking, fingerSq, (uint32_t)(fx16 >> 4), (uint32_t)(fy16 >> 4), frame >> 3, match::lastTo,
-        match::checkSq, nTgt, over, tapT, annT, ui, checkWait,
+        match::checkSq, nTgt, over, tapT, annT, ui, waitPress,
     };
     for (uint32_t x : v) h = (h ^ x) * 16777619u;
     return h;

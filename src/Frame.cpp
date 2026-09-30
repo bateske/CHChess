@@ -22,9 +22,10 @@ namespace frame {
 // board a flush alone costs the search ~5 ms of CPU and a redraw ~8 more, so
 // short smooth bursts beat drawing thinly all along. A button starts a burst
 // at once, and a held one or an open menu keeps it going. The engine calls
-// back every 8 nodes (CH2K_POLL_NODES, ~5 ms), so that is prompt.
-static const uint16_t FIRST_MS = 300, SEARCH_MS = 2000, BURST_MS = 450;
-static uint32_t burstAt;
+// back every 8 nodes (CH2K_POLL_NODES, ~5 ms), so that is prompt. Between
+// bursts, a frame every BOB_MS keeps the glove bobbing (a step of it each).
+static const uint16_t FIRST_MS = 300, SEARCH_MS = 2000, BURST_MS = 450, BOB_MS = 133;
+static uint32_t burstAt, bobAt;
 // Lockstep (scripts, the simulator): one frame per two polls, i.e. per 16
 // nodes, so a scripted CPU move always takes the same frames.
 static const uint8_t POLLS_PER_FRAME = 2;
@@ -117,7 +118,14 @@ static void thinkFrame() {
 #endif
     uint32_t now = millis();
     if (eng::nodes() <= 8) burstAt = now + FIRST_MS;        // a new search
-    if ((int32_t)(now - burstAt) < 0 && !(chgame_readButtons() | arduboy.injected)) return;
+    if ((int32_t)(now - burstAt) < 0 && !(chgame_readButtons() | arduboy.injected)) {
+        if ((int32_t)(now - bobAt) >= 0) {
+            bobAt = now + BOB_MS;
+            arduboy.frameCount |= 7;                 // frame >> 3 (the bob) steps on by one
+            run(true);
+        }
+        return;
+    }
     stage::thinkPick();
     uint32_t end = now + BURST_MS;
     while ((int32_t)(millis() - end) < 0 || (chgame_readButtons() | arduboy.injected) || screens::holdFrames()) {

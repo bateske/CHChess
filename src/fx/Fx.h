@@ -20,7 +20,6 @@ enum Kind : uint8_t { SPARK, CONFETTI, STAR, DUST };
 void spawn(Kind k, int x, int y, int vx16, int vy16, uint8_t life, uint8_t colour);
 void burst(Kind k, int x, int y, uint8_t n, int speed16, uint8_t colour);  // radial
 void fountain(int x, int y, uint8_t n);                                    // confetti up
-bool particlesAlive();
 
 // Big centred lettering with an outline; pops in, holds, fades.
 enum BannerStyle : uint8_t { B_RAINBOW, B_GOLD, B_RED, B_CYAN, B_WHITE };
@@ -38,8 +37,7 @@ void clear();
 void update();                      // once per frame
 // dust: the size of a DUST puff (2 at the board's usual size, more zoomed in).
 void drawParticles(uint8_t dust);
-bool particles();                    // any still flying
-void scroll(int dx, int dy);         // move them all (with the camera, so they keep their place)
+bool particles();                    // any still flying (screen space: the stage keeps the camera still meanwhile)
 extern const uint8_t RAIN[5];        // the casino rainbow: red, gold, green, cyan, blue
 void drawBanner();
 void applyShake(int y0, int y1);    // post-process rows y0..y1 of the framebuffer
