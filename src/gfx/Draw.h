@@ -14,9 +14,8 @@ void roundRect(int x, int y, int w, int h, uint8_t r, uint8_t c);
 
 // span4 art (tools/assets.py pack_span4): w, h, then per row a count and
 // (len-1)<<4|colour bytes, colour 15 = skip. Drawn through a remap,
-// mirrored left-right and/or ghosted (every other pixel, checkerboard) -
-// pieces in front of the cursor - and scaled (Q8, 256 = 1:1).
-enum : uint8_t { SPR_MIRROR = 1, SPR_GHOST = 2 };
+// mirrored left-right and scaled (Q8, 256 = 1:1).
+enum : uint8_t { SPR_MIRROR = 1 };
 void sprite4(const uint8_t *data, int x, int y, const uint8_t *remap, uint8_t flags, int scale = 256);
 // span4 art turned by `angle` (256 = one turn) and scaled (256 = 1:1) about
 // its pixel (ax, ay), which lands on screen (px, py). Decodes into the CHGfx

@@ -214,8 +214,6 @@ void update(bool stageBusy) {
     }
 }
 
-uint8_t movable(uint8_t *sq) { return phase == HUMAN ? eng::movers(sq) : 0; }
-
 uint8_t movesFrom(uint8_t from, uint8_t *to, uint8_t *capture) {
     if (phase != HUMAN) return 0;
     eng::Move ms[32];

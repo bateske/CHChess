@@ -24,6 +24,11 @@ say X 8/P7/8/8/8/8/k6K/8 w - -
 wait 12
 say M 48 56 5
 gif promote 50 2
+# Promotion with a capture: bxa8=Q, the longest call-out
+say X r3k3/1P6/8/8/8/8/8/4K3 w - -
+wait 12
+say M 49 56 5
+gif promote_capture 150 3
 # Mate: Qxf7#
 say X r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq -
 wait 12

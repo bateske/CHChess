@@ -57,23 +57,10 @@ static inline __attribute__((always_inline)) void fillRun(uint8_t *row, int a, i
     if (len) *p = (uint8_t)((*p & 0xF0) | c);
 }
 
-// A ghosted run: every other pixel, checkerboard (pieces in front of the
-// cursor).
-RAMFUNC(ghostrun) static void ghostRun(uint8_t *row, int a, int e, int y, uint8_t c) {
-    for (int k = a + ((a + y) & 1); k < e; k += 2)
-        if ((unsigned)k < GFX_W) plot(row + (k >> 1), k, c);
-}
-
-// One run of a sprite row.
-static inline __attribute__((always_inline)) void spriteRun(uint8_t *row, int a, int e, int y, uint8_t c, bool ghost) {
-    if (!ghost) fillRun(row, a, e - a, c);
-    else ghostRun(row, a, e, y, c);
-}
-
 RAMFUNC(sprite4) void sprite4(const uint8_t *d, int x, int y, const uint8_t *remap, uint8_t flags, int scale) {
     uint8_t w = d[0], h = d[1];
     d += 2;
-    bool mirror = flags & SPR_MIRROR, ghost = flags & SPR_GHOST;
+    bool mirror = flags & SPR_MIRROR;
     for (int j = 0; j < h; j++) {
         uint8_t n = *d++;
         const uint8_t *runs = d;
@@ -86,7 +73,7 @@ RAMFUNC(sprite4) void sprite4(const uint8_t *d, int x, int y, const uint8_t *rem
             for (uint8_t i = 0; i < n; i++) {
                 uint8_t b = runs[i];
                 int len = (b >> 4) + 1;
-                if ((b & 15) != 15) spriteRun(row, q, q + len, y + j, remap[b & 15], ghost);
+                if ((b & 15) != 15) fillRun(row, q, len, remap[b & 15]);
                 q += len;
             }
             continue;
@@ -101,8 +88,10 @@ RAMFUNC(sprite4) void sprite4(const uint8_t *d, int x, int y, const uint8_t *rem
             for (uint8_t i = 0; i < n; i++) {
                 uint8_t b = runs[i];
                 int len = (b >> 4) + 1, p0 = mirror ? w - px - len : px;
-                if ((b & 15) != 15)
-                    spriteRun(row, x + ((p0 * scale) >> 8), x + (((p0 + len) * scale) >> 8), yy, remap[b & 15], ghost);
+                if ((b & 15) != 15) {
+                    int a = x + ((p0 * scale) >> 8);
+                    fillRun(row, a, x + (((p0 + len) * scale) >> 8) - a, remap[b & 15]);
+                }
                 px += len;
             }
         }

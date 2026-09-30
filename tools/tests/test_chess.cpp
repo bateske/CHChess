@@ -138,16 +138,6 @@ static void testSnapshot() {
             if (!n || eng::status() > eng::CHECK) break;
             eng::play(ms[rnd() % n]);
         }
-        // movers(): exactly the squares legal moves start from, once each.
-        {
-            uint8_t n = eng::legal(ms), sq[64], k = eng::movers(sq);
-            bool from[64] = {}, seen[64] = {};
-            for (uint8_t i = 0; i < n; i++) from[eng::from(ms[i])] = true;
-            int count = 0;
-            for (int q = 0; q < 64; q++) count += from[q];
-            CHECK_EQ(k, count);
-            for (uint8_t i = 0; i < k; i++) { CHECK(from[sq[i]] && !seen[sq[i]]); seen[sq[i]] = true; }
-        }
         eng::Snap s;
         eng::snapshot(s);
         uint8_t board[64];

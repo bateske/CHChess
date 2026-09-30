@@ -49,7 +49,6 @@ void restore(const Snap &s);                    // out of book, 50-move count re
 void play(Move m);                              // must be legal
 uint8_t legal(Move *out);                       // all legal moves (<= 218; tests)
 uint8_t movesFrom(uint8_t from, Move *out);     // legal moves of one piece (<= 32)
-uint8_t movers(uint8_t *out);                   // squares whose piece can move (<= 16)
 Move findMove(uint8_t from, uint8_t to, uint8_t promo);   // NO_MOVE if illegal
 uint8_t moveCount();                            // number of legal moves
 Status status();

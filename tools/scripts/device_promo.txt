@@ -1,0 +1,30 @@
+# On the board: march the b-pawn up and promote with a capture (the longest
+# call-out, "PAWN TAKES KNIGHT ON B8 = QUEEN"), two players.
+say G 1 0 0 1
+wait 60
+say M 9 25
+wait 200
+say M 55 47
+wait 200
+say M 25 33
+wait 200
+say M 47 39
+wait 200
+say M 33 41
+wait 200
+say M 39 31
+wait 200
+say M 41 48
+perf reset
+free 8
+perf capture_slowed
+say M 31 23
+wait 200
+say M 48 57 5
+perf reset
+free 8
+perf promote_capture
+snap promoted
+perf reset
+free 2
+perf after

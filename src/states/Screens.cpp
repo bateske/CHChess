@@ -299,11 +299,16 @@ static void cycleView() {
     audio::sfx(Sfx::Whoosh);
 }
 
-// The cursor only visits what can be played: your pieces that have a move,
-// or, once one is picked up, the squares it can go to.
+// The cursor visits your pieces (the plate says when one is stuck), or,
+// once one is picked up, the squares it can go to.
 static uint8_t spots(uint8_t *list) {
-    uint8_t s = stage::selected(), cap[32];
-    return s != 0xFF ? match::movesFrom(s, list, cap) : match::movable(list);
+    uint8_t s = stage::selected(), cap[32], n = 0;
+    if (s != 0xFF) return match::movesFrom(s, list, cap);
+    for (uint8_t sq = 0; sq < 64; sq++) {
+        uint8_t p = match::board[sq];
+        if (p && ((p & eng::BLACK) != 0) == match::blackToMove()) list[n++] = sq;
+    }
+    return n;
 }
 
 // The spot nearest `from` in screen direction (ux, uy) - diagonals and all,
@@ -354,11 +359,13 @@ static void playInput() {
         stage::setCursor(s);                 // back onto the piece
         audio::sfx(Sfx::Cursor);
     }
+    c = stage::cursor();
+    uint8_t to[32], cap[32], k = s == 0xFF ? match::movesFrom(c, to, cap) : 1;
+    stage::setBlocked(!k);
     if (arduboy.justPressed(A_BUTTON)) {
-        c = stage::cursor();
         if (s != 0xFF) tryTarget(c);
+        else if (!k) audio::sfx(Sfx::Deny);
         else {
-            uint8_t to[32], cap[32], k = match::movesFrom(c, to, cap);
             stage::select(c, to, cap, k);
             stage::setCursor(nearest(to, k, c, 0, 0));
         }

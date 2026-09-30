@@ -4,8 +4,9 @@ Chess for the [CHGame](https://github.com/bateske/CH32SerialBoot) handheld
 (CH32X035 RISC-V, 128x128 colour LCD, piezo), in the casino style of
 [CHBlackjack](https://github.com/bateske/CHBlackjack): an isometric board on
 a casino carpet, a pointing glove to pick pieces up, legal moves lit with
-shimmering, marching borders, a camera that whips in close on every move
-and pulls back out, each move called out ("ROOK TAKES QUEEN ON A4"),
+shimmering, marching borders, a camera that takes a beat and then whips in
+close on every move (captures play out in slow motion), each move called
+out ("ROOK TAKES QUEEN ON A4"),
 captured pieces knocked off the board tumbling, CHECK! and CHECKMATE! in
 Blackjack's dancing gradient letters, and a CPU opponent whose red glove
 hovers over the pieces it is thinking about.
@@ -35,7 +36,7 @@ You need the Arduino IDE (2.x) or `arduino-cli`, and:
 3. **This repository**, in a folder named `CHChess`.
 
 The game needs **link-time optimisation** to fit the 50,944-byte application
-region (it is 50.3 KB with it, 56.1 KB without). With a board package that
+region (it is 50.2 KB with it, 56 KB without). With a board package that
 has it, pick *Tools > Optimize > Smallest + LTO*. From the command line, on
 any CHGame package:
 
@@ -48,19 +49,21 @@ any CHGame package:
 
 | Button | On the board | Elsewhere |
 |---|---|---|
-| D-pad | move the glove between your pieces that can move, or, holding one, between the squares it can go to | menus |
+| D-pad | move the glove between your pieces, or, holding one, between the squares it can go to | menus |
 | A | pick up the piece / put it down there | select |
 | B | put the piece back | back |
 | B + D-pad | look around: the camera springs that way until you let go | |
 | SELECT | change view: the board, or the map (from above) | |
 | START | pause: resume, undo, resign, save + quit | |
 
-The glove only ever stops where something can happen. Each press takes it
+The glove only stops on your own pieces (the one under it gets a rainbow
+outline), or, holding one, on the squares it can go to. Each press takes it
 to the nearest spot in that direction as the screen shows it (diagonals
 included, whatever the view); with nothing that way it wraps round to the
 farthest spot the other way, so pressing on steps through them all. A plate
-at the foot of the screen names what it is on ("KNIGHT G1", "KNIGHT TO F3",
-"KNIGHT TAKES PAWN"), then calls out each move as it lands. During your
+at the foot of the screen names what it is on ("KNIGHT G1", "BISHOP F1 NO
+MOVES", "KNIGHT TO F3", "KNIGHT TAKES PAWN"), then calls out each move as
+it lands. During your
 turn the other side's last move is lit in gold. The camera leans towards
 the middle of the board, so the selection is always in view without empty
 carpet at the edges.

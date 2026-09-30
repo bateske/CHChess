@@ -120,18 +120,6 @@ uint8_t legal(Move *out) {
     return n;
 }
 
-uint8_t movers(uint8_t *out) {
-    GUARD();
-    uint8_t n = g.gen_moves(&g.mvs_[0]), k = 0;
-    if (n == ch2k::game::GEN_MOVES_OUT_OF_MEM) return 0;
-    for (uint8_t i = 0; i < n; i++) {
-        uint8_t f = toSq(g.mvs_[i].fr()), j = 0;
-        while (j < k && out[j] != f) j++;
-        if (j == k) out[k++] = f;
-    }
-    return k;
-}
-
 uint8_t movesFrom(uint8_t from, Move *out) {
     GUARD();
     uint8_t n = g.gen_moves(&g.mvs_[0]), k = 0;

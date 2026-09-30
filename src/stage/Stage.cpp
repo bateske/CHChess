@@ -48,11 +48,12 @@ static uint8_t viewMode;
 static bool hints = true, fast;
 static bool humanTurn, thinking;
 
-struct Mover { uint8_t piece, from, to, t, T, arc, delay, on; };
+struct Mover { uint8_t piece, from, to, t, T, arc, delay, on, sound; };   // sound: Sfx + 1 as it lifts
 static Mover mv[2];
 
-// A captured piece, knocked off and tumbling (world position, Q4).
-struct Flyer { uint8_t piece, t, on; int8_t spin; int16_t x, y, z, vx, vz; uint8_t ang; };
+// A captured piece, knocked off its square away from the attacker, up and
+// over, spinning: t counts ticks, `slow` times slower in a slowed capture.
+struct Flyer { uint8_t piece, sq, on, slow; int8_t dir; uint16_t t; };
 static Flyer fly;
 
 // Toppling king at mate.
@@ -88,11 +89,16 @@ static int8_t sprDX, sprDY;
 // out, one every other), and zoomHold is the look at a landed move before
 // the camera pulls back.
 static uint8_t zoomTo = 5, zoomHold, zoomTick;
+// Before it, a beat on the piece; a capture plays out CAPTURE_SLOW times
+// slower (slowF), to sell it.
+static const uint8_t WHIP_BEAT = 14, CAPTURE_SLOW = 4;
+static uint8_t beatT, slowF = 1;
+static bool blocked;                 // the piece under the glove has no move
 
 // The last move in words where the hover plate goes, popping up word by
 // word: "KNIGHT TO F3", "ROOK TAKES QUEEN ON A4".
-static const char *annW[5];
-static uint8_t annC[5], annN, annT;
+static const char *annW[7];            // at most: PAWN TAKES ROOK ON B8 = QUEEN
+static uint8_t annC[7], annN, annT;
 static char annSq[3];
 
 // ---------------------------------------------------------------------------
@@ -186,20 +192,18 @@ void setZoom(uint8_t h) {
     cx16 = cx16 * h / o; cy16 = cy16 * h / o;
     aimX = (int16_t)(aimX * h / o); aimY = (int16_t)(aimY * h / o);
     fx16 = fx16 * h / o; fy16 = fy16 * h / o;
-    int16_t *f[5] = {&fly.x, &fly.y, &fly.z, &fly.vx, &fly.vz};
-    for (int16_t *v : f) *v = (int16_t)(*v * h / o);
 }
 void setHints(bool on) { hints = on; }
 void setCoords(bool on) { iso::coords = on; }
 void setFast(bool on) { fast = on; }
 uint8_t selected() { return sel; }
+void setBlocked(bool b) { blocked = b; }
 
 void setView(uint8_t v) {
     viewMode = v;
     iso::setView(v == MAP);
     setZoom(zoomTo = 5);
     zoomHold = 0;
-    fly.on = 0;                      // it lives in the old view's world
     sprX = sprY = sprVX = sprVY = 0;
     aimSq(cur, 2);
     snapCamera();
@@ -237,7 +241,7 @@ void deselect() {
 }
 
 bool busy() {
-    return mv[0].on || mv[1].on || fly.on || holdT || picking || topT || handT || zoomHold ||
+    return mv[0].on || mv[1].on || fly.on || holdT || picking || topT || handT || zoomHold || beatT ||
            (tileH != zoomTo && !flat);
 }
 bool overShown() { return overDone; }
@@ -314,14 +318,15 @@ static void onPick(uint8_t from, uint8_t to) {
     intent = to;
 }
 
-static void launch(Mover &m, uint8_t piece, uint8_t from, uint8_t to, uint8_t arc, uint8_t delay) {
+static void launch(Mover &m, uint8_t piece, uint8_t from, uint8_t to, uint8_t arc, uint8_t delay, uint8_t sound) {
     int df = (from & 7) - (to & 7), dr = (from >> 3) - (to >> 3);
     if (df < 0) df = -df;
     if (dr < 0) dr = -dr;
     int d = df > dr ? df : dr;
     m.piece = piece; m.from = from; m.to = to; m.t = 0;
-    m.T = (uint8_t)(fast ? 10 + d * 2 : 14 + d * 3);
-    m.arc = arc; m.delay = delay; m.on = 1;
+    m.T = (uint8_t)((fast ? 10 + d * 2 : 14 + d * 3) * slowF);
+    m.arc = arc; m.delay = delay; m.on = 1; m.sound = sound;
+    if (!delay && sound) audio::sfx((Sfx)(sound - 1));
 }
 
 static match::Event pending;          // the move being shown (captures resolve on landing)
@@ -332,22 +337,25 @@ static void onMove(const match::Event &e) {
     humanTurn = false;
     thinking = false;
     deselect();
-    if (!flat && !fast) zoomTo = 10;     // whip in on it
+    // The whip (not on the map, nor at QUICK pace): a beat on the piece,
+    // then the camera dives in as it lifts.
+    bool whip = !flat && !fast;
+    slowF = whip && e.captured ? CAPTURE_SLOW : 1;
+    beatT = whip ? (uint8_t)(WHIP_BEAT * slowF) : 0;
+    uint8_t wait = whip ? (uint8_t)(beatT + 6) : 0;
     shown[e.a] = 0;
     bool knight = (e.piece & eng::TYPE) == eng::KNIGHT;
-    launch(mv[0], e.piece, e.a, e.b, knight ? 12 : 3, 0);
-    if (knight) audio::sfx(Sfx::Hop);
+    launch(mv[0], e.piece, e.a, e.b, knight ? 12 : 3, wait, knight ? (uint8_t)Sfx::Hop + 1 : 0);
     if (e.rookFrom != 0xFF) {
         uint8_t rook = shown[e.rookFrom];
         shown[e.rookFrom] = 0;
-        launch(mv[1], rook, e.rookFrom, e.rookTo, 10, 10);
-        audio::sfx(Sfx::Castle);
+        launch(mv[1], rook, e.rookFrom, e.rookTo, 10, (uint8_t)(wait + 10), (uint8_t)Sfx::Castle + 1);
     }
 }
 
 static const char *const NAMES[7] = {"", "PAWN", "KNIGHT", "BISHOP", "ROOK", "QUEEN", "KING"};
 
-static void addWord(const char *w, uint8_t c) { annW[annN] = w; annC[annN++] = c; }
+static void addWord(const char *w, uint8_t c) { if (annN < 7) { annW[annN] = w; annC[annN++] = c; } }
 
 static void announce(const match::Event &e) {
     annN = 0;
@@ -387,12 +395,10 @@ static void land(Mover &m, bool main) {
         int ax, ay, bx, by;
         worldOf(e.a, ax, ay); worldOf(e.capSq, bx, by);
         fly.piece = e.captured;
-        fly.x = (int16_t)(bx << 4); fly.y = (int16_t)(by << 4); fly.z = 0;
-        int s = zoomed(16);
-        fly.vx = (int16_t)(bx > ax ? s : bx < ax ? -s : (fx::rnd() & 1 ? s : -s));
-        fly.vz = (int16_t)zoomed(44);
-        fly.spin = (int8_t)(fly.vx > 0 ? 11 : -11);
-        fly.ang = 0; fly.t = 0; fly.on = 1;
+        fly.sq = e.capSq;
+        fly.dir = (int8_t)(bx > ax ? 1 : bx < ax ? -1 : (fx::rnd() & 1 ? 1 : -1));
+        fly.slow = slowF;
+        fly.t = 0; fly.on = 1;
         fx::burst(fx::SPARK, x, y - up / 2, 12, 36, GOLD);
         fx::burst(fx::STAR, x, y - up / 2, 4, 24, WHITE);
         fx::shake(10, 2);
@@ -417,7 +423,7 @@ static void land(Mover &m, bool main) {
     // Take in the landing, then pull back - unless it was mate: stay on it.
     match::Event nx;
     bool mate = match::peekEvent(nx) && nx.type == match::EV_OVER && nx.b == match::BY_MATE;
-    if (zoomTo > 5 && !mate) zoomHold = (uint8_t)(e.captured ? 34 : 20);
+    if (zoomTo > 5 && !mate) zoomHold = (uint8_t)((e.captured ? 30 : 20) * slowF);
 }
 
 static void onCheck() {
@@ -462,6 +468,19 @@ void begin() {
 // ---------------------------------------------------------------------------
 // Per tick
 // ---------------------------------------------------------------------------
+// The knocked-off piece on screen at its tick t, and its spin: thrown at
+// zoomed(16) (Q4 px a tick) across and a third of that down the screen,
+// zoomed(44) up, falling back at zoomed(4) a tick.
+static void flyAt(int &sx, int &sy, uint8_t &ang) {
+    int x, y;
+    worldOf(fly.sq, x, y);
+    int t4 = fly.t * 16 / fly.slow, v = fly.dir * zoomed(16);      // ticks, Q4
+    int z = (zoomed(44) * t4 / 16 - zoomed(4) * t4 * (t4 - 16) / 512) / 16;
+    sx = toScreenX(x + v * t4 / 256);
+    sy = toScreenY(y + v * t4 / 768) - z;
+    ang = (uint8_t)(fly.dir * 11 * t4 / 16);
+}
+
 static void moverPos(const Mover &m, int &x, int &y, int &z) {
     int ax, ay, bx, by;
     worldOf(m.from, ax, ay);
@@ -493,24 +512,25 @@ void update(bool think) {
     }
 
     if (holdT) holdT--;
+    if (beatT && !--beatT) { zoomTo = 10; audio::sfx(Sfx::Whoosh); }
     if (zoomHold && !--zoomHold) zoomTo = 5;
-    if (tileH != zoomTo && !flat && (tileH < zoomTo || (++zoomTick & 1)))
+    // In a step every other frame, back out a step every third.
+    if (tileH != zoomTo && !flat && !(++zoomTick % (tileH < zoomTo ? 2 : 3)))
         setZoom((uint8_t)(tileH < zoomTo ? tileH + 1 : tileH - 1));
     if (annT && ++annT > ANN_FRAMES) annT = 0;
     for (int k = 0; k < 2; k++) {
         Mover &m = mv[k];
         if (!m.on) continue;
-        if (m.delay) m.delay--;
+        if (m.delay) { if (!--m.delay && m.sound) audio::sfx((Sfx)(m.sound - 1)); }
         else if (++m.t >= m.T) land(m, k == 0);
     }
 
     if (fly.on) {
+        int sx, sy;
+        uint8_t a;
         fly.t++;
-        fly.x += fly.vx; fly.y += fly.vx / 3;
-        fly.z += fly.vz; fly.vz -= (int16_t)zoomed(4);
-        fly.ang += fly.spin;
-        int sx = toScreenX(fly.x >> 4), sy = toScreenY(fly.y >> 4) - (fly.z >> 4);
-        if (fly.t > 90 || sx < -30 || sx > 158 || sy > 190) fly.on = 0;
+        flyAt(sx, sy, a);
+        if (fly.t > 90 * fly.slow || sx < -30 || sx > 158 || sy > 190) fly.on = 0;
     }
 
     if (topT && topT < 60) topT++;
@@ -518,7 +538,7 @@ void update(bool think) {
 
     // What the camera frames: the move in flight, the CPU's finger, the
     // toppling king, or your cursor.
-    if (mv[0].on && !mv[0].delay) {
+    if (mv[0].on) {
         int x, y, z;
         moverPos(mv[0], x, y, z);
         aimAt(x, y - zoomed(6), 2);
@@ -614,19 +634,6 @@ static void drawOverlays(uint32_t frame) {
     }
 }
 
-// Pieces standing in front of the cursor (or of the mated king), over its
-// square, are ghosted.
-static bool hidesCursor(uint8_t sq, int x, int y, const PieceArt &a) {
-    uint8_t f = over ? topSq : (humanTurn ? cur : 0xFF);
-    if (f == 0xFF || flat) return false;
-    int d = depthOf(sq) - depthOf(f);
-    if (d < 1 || d > 4) return false;
-    int cxs, cys;
-    screenOf(f, cxs, cys);
-    int left = x - zoomed(a.ax), top = y - zoomed(a.ay), w = zoomed(a.data[0]);
-    return cxs + zoomed(3) > left && cxs - zoomed(3) < left + w && cys - zoomed(2) > top;
-}
-
 static void drawPiece(uint8_t p, int x, int y, uint8_t flags, const uint8_t *remap, int scale) {
     const PieceArt &a = art(p);
     bool mirror = (p & eng::TYPE) == eng::KNIGHT && ((p & eng::BLACK) != 0) != cam.flip;
@@ -671,22 +678,31 @@ static void drawPieces(uint32_t frame) {
                 spriteRot(a.data, a.ax, a.ay, x, y, (uint8_t)((topDir * 60 * e) >> 8), zscale(), remapFor(p), false);
                 continue;
             }
-            uint8_t flags = hidesCursor(sq, x, y, a) ? SPR_GHOST : 0;
+            // Your piece under the glove, or picked up: a rainbow outline.
+            const uint8_t *rm = nullptr;
+            uint8_t hl[16];
+            if (humanTurn && (sq == sel || (sq == cur && sel == 0xFF))) {
+                memcpy(hl, remapFor(p), 16);
+                hl[INK] = FX_A;
+                rm = hl;
+            }
             if (sq == sel) {
                 fillEllipse(x, y, zoomed(3), (tileH + 2) / 5, INK);
                 y -= zoomed(3) + (zoomed(fx::isin((int)(frame >> 3) * 48)) >> 8);
             }
             bool cap = false;
             bool blink = sel != 0xFF && (frame & 8) && isTarget(sq, cap) && cap;
-            drawPiece(p, x, y, flags, blink ? RM_HIT : nullptr, zscale());
+            drawPiece(p, x, y, 0, blink ? RM_HIT : rm, zscale());
         }
         for (int k = 0; k < 2; k++) if (mv[k].on && md[k] == d) drawMover(mv[k]);
     }
     if (fly.on) {
-        int sx = toScreenX(fly.x >> 4), sy = toScreenY(fly.y >> 4) - (fly.z >> 4);
+        int sx, sy;
+        uint8_t ang;
+        flyAt(sx, sy, ang);
         const PieceArt &a = art(fly.piece);
-        spriteRot(a.data, a.data[0] / 2, a.data[1] / 2, sx, sy - zoomed(a.ay) / 2, fly.ang, zscale(),
-                  fly.t < 4 ? RM_HIT : remapFor(fly.piece), false);
+        spriteRot(a.data, a.data[0] / 2, a.data[1] / 2, sx, sy - zoomed(a.ay) / 2, ang, zscale(),
+                  fly.t < 4 * fly.slow ? RM_HIT : remapFor(fly.piece), false);
     }
 }
 
@@ -780,11 +796,11 @@ static void drawHud(uint32_t frame) {
     } else if (humanTurn && (shown[cur] || sel != 0xFF)) {
         // What the finger is on: a piece, or where the picked-up one would go.
         char sq[3] = {(char)('A' + (cur & 7)), (char)('1' + (cur >> 3)), 0};
-        const char *w[3] = {NAMES[shown[sel != 0xFF ? sel : cur] & eng::TYPE], " ", sq};
-        uint8_t c[3] = {WHITE, WHITE, GOLD};
+        const char *w[4] = {NAMES[shown[sel != 0xFF ? sel : cur] & eng::TYPE], " ", sq, blocked ? " NO MOVES" : ""};
+        uint8_t c[4] = {WHITE, WHITE, GOLD, SILVER};
         if (sel != 0xFF && shown[cur]) { w[1] = " TAKES "; c[1] = RED; w[2] = NAMES[shown[cur] & eng::TYPE]; c[2] = WHITE; }
         else if (sel != 0xFF) { w[1] = " TO "; c[1] = SILVER; }
-        plate(w, c, 3, py, 256, 99);
+        plate(w, c, 4, py, 256, 99);
     }
 }
 
