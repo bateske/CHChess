@@ -3,7 +3,6 @@ keeps an indexed PNG's colour table), and back.
 
     python tools/sheet.py export [SHEET]      # write tools/art/sheet.png (+ sheet_preview.png, 4x)
     python tools/sheet.py import [SHEET]      # read it back, then rebuild the game's assets
-    python tools/sheet.py import --palette    # ...and take its colour table as the game palette
 
 The sheet is an indexed PNG on the game's 16-colour palette, index 16
 transparent. Paint only with the colour table's colours.
@@ -17,16 +16,20 @@ transparent. Paint only with the colour table's colours.
   WHITE,  the pieces as each side shows them: MASTER through the palette
   BLACK   swap. Recolour them to change the swap - a colour of MASTER must
           become one colour on a side (the import takes each MASTER colour's
-          most common colour and reports the rest). Shape edits here are
-          ignored.
+          most common colour and reports the rest). Or redraw them outright
+          (clear MASTER's pieces, or change their shapes here): the import
+          then rebuilds the art from these two rows - each White/Black pair
+          of colours becomes one tone of the shared art - so both sides'
+          shapes must match, and at most 16 pairs.
   SWAP    the same swap as a key: per palette colour, what it becomes on
           White and on Black. Editing a square changes the swap too (the
           piece rows win if both changed).
 
 Palette: the swatch lists the 16 colours. FX_A and FX_B are animated in
 the game (placeholders here); FELT_DK, FELT and FELT_LT follow the board
-colour option. Changing the colour table itself changes the whole game's
-palette, so the import only reports it unless given --palette.
+colour option. Colours are read by value (editors may reorder the colour
+table); a colour that isn't the game's is an error - changing the palette
+itself is a code change.
 """
 import re
 import subprocess
@@ -39,7 +42,9 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import assets  # noqa: E402
 from assets import (ART, NAMES, PALETTE, PIECES, TRANSPARENT, load_hand, load_piece,  # noqa: E402
-                    load_sides, rgb, save_png, save_sides)
+                    load_sides, save_png, save_sides)
+
+INK = 0
 
 ROOT = HERE.parent
 SHEET = ART / "sheet.png"
@@ -162,29 +167,11 @@ def export(path):
 # Import
 # ---------------------------------------------------------------------------
 def read_indices(path):
-    """-> 2D palette indices (TRANSPARENT where clear) and the colour table (16 RGBs) or None."""
-    im = Image.open(path)
-    if im.mode == "P":
-        table = im.getpalette()[:48]
-        trans = im.info.get("transparency")
-        rgba_trans = None
-        if isinstance(trans, bytes):          # per-entry alpha
-            rgba_trans = trans
-        px = im.load()
-        out = []
-        for y in range(im.height):
-            row = []
-            for x in range(im.width):
-                i = px[x, y]
-                clear = i >= 16 or i == trans or (rgba_trans is not None and i < len(rgba_trans) and rgba_trans[i] == 0)
-                row.append(TRANSPARENT if clear else i)
-            out.append(row)
-        return out, [tuple(table[i * 3:i * 3 + 3]) for i in range(16)]
-    # Converted to RGB(A) on the way: match colours exactly (FX_B's placeholder
-    # included; GOLD before FX_B).
-    lut = {table_rgb(i): i for i in reversed(range(16))}
-    im = im.convert("RGBA")
-    out = []
+    """-> 2D game palette indices, TRANSPARENT where clear. Matched by colour:
+    editors may save the colour table in their own order."""
+    lut = {table_rgb(i): i for i in reversed(range(16))}     # GOLD before FX_B
+    im = Image.open(path).convert("RGBA")
+    out, bad = [], {}
     for y in range(im.height):
         row = []
         for x in range(im.width):
@@ -194,9 +181,14 @@ def read_indices(path):
             elif (r, g, b) in lut:
                 row.append(lut[(r, g, b)])
             else:
-                raise SystemExit(f"({x},{y}): #{r:02X}{g:02X}{b:02X} is not a palette colour")
+                bad.setdefault((r, g, b), (x, y))
+                row.append(TRANSPARENT)
         out.append(row)
-    return out, None
+    if bad:
+        raise SystemExit("not palette colours: " + ", ".join(
+            f"#{r:02X}{g:02X}{b:02X} at {xy}" for (r, g, b), xy in bad.items()) +
+            " - paint with the sheet's colours (changing the palette itself is a code change)")
+    return out
 
 
 def cell(pix, c, r):
@@ -214,7 +206,7 @@ def crop(img):
 
 
 def place(img, ax, ay):
-    """A piece as exported into its cell (the old art, to compare the side rows with)."""
+    """A piece as exported into its cell."""
     out = [[TRANSPARENT] * CW for _ in range(CH)]
     for j, row in enumerate(img):
         for i, v in enumerate(row):
@@ -223,52 +215,40 @@ def place(img, ax, ay):
     return out
 
 
-def import_(path, take_palette):
-    pix, table = read_indices(path)
+def opaque(img):
+    return [[v != TRANSPARENT for v in row] for row in img]
+
+
+def write_piece(name, img, left, top):
+    ax, ay = AX - left, AY - top
+    if (img, ax, ay) != load_piece(name):
+        dst = ART / "pieces" / f"{name}.png"
+        save_png(dst, img)
+        dst.with_suffix(".anchor").write_text(f"{ax} {ay}\n")
+        print(f"art: {name} -> tools/art/pieces/{name}.png (base centre {ax},{ay})")
+
+
+def import_(path):
+    pix = read_indices(path)
     if len(pix) < H or len(pix[0]) < W:
         raise SystemExit(f"{path}: expected at least {W}x{H} (the exported layout)")
     notes = []
     old = load_sides()
-    new = [list(m) for m in old]
+    cells = [[cell(pix, c, r) for r in range(3)] for c in range(len(PIECES))]
 
-    # The swap, from the side rows: what each MASTER colour became, compared
-    # against the art as it was exported.
-    from_rows = [dict(), dict()]
-    for c, name in enumerate(PIECES):
-        art, ax, ay = load_piece(name)
-        master = place(art, ax, ay)
-        for side in (0, 1):
-            got = cell(pix, c, side + 1)
-            for y in range(CH):
-                for x in range(CW):
-                    m, v = master[y][x], got[y][x]
-                    if (m == TRANSPARENT) != (v == TRANSPARENT):
-                        from_rows[side].setdefault("shape", set()).add(name)
-                    elif m != TRANSPARENT:
-                        votes = from_rows[side].setdefault(m, {})
-                        votes[v] = votes.get(v, 0) + 1
-    for side, sname in ((0, "WHITE"), (1, "BLACK")):
-        for name in sorted(from_rows[side].pop("shape", ())):
-            notes.append(f"{sname} {name}: shape differs from MASTER - ignored (edit shapes in MASTER)")
-        for m, votes in from_rows[side].items():
-            best = max(votes, key=votes.get)
-            stray = sum(votes.values()) - votes[best]
-            if stray:
-                notes.append(f"{sname}: {NAMES[m]} became {NAMES[best]} in {votes[best]} pixels, "
-                              f"something else in {stray} - a swap is one colour per art colour; kept {NAMES[best]}")
-            if best != old[side][m]:
-                new[side][m] = best
-    # The key: squares changed there count unless the pieces changed that colour.
-    for side in (0, 1):
-        y = KEY_Y + (side + 1) * KEY_STEP + KEY_SQ // 2
-        for i in range(16):
-            v = pix[y][LX + i * KEY_STEP + KEY_SQ // 2]
-            if v != TRANSPARENT and v != old[side][i]:
-                if new[side][i] == old[side][i]:
-                    new[side][i] = v
-                elif new[side][i] != v:
-                    notes.append(f"{('WHITE', 'BLACK')[side]}: {NAMES[i]} - pieces say {NAMES[new[side][i]]}, "
-                                 f"the key says {NAMES[v]}; took the pieces")
+    # Which rows are the art? MASTER, if every piece is there and both side
+    # rows keep its shapes; else the WHITE and BLACK rows themselves.
+    from_sides = any(not crop(m) or opaque(w) != opaque(m) or opaque(b) != opaque(m) for m, w, b in cells)
+    if from_sides:
+        new = rebuild_from_sides(cells, notes)
+    else:
+        new = [list(m) for m in old]
+        swap_from_rows(cells, old, new, notes)
+        swap_from_key(pix, old, new, notes)
+        for c, name in enumerate(PIECES):
+            img, left, top = crop(cells[c][0])
+            write_piece(name, img, left, top)
+
     for side, sname in ((0, "White"), (1, "Black")):
         for i in range(16):
             if new[side][i] != old[side][i]:
@@ -276,56 +256,108 @@ def import_(path, take_palette):
     if new != old:
         save_sides(new)
 
-    # The art itself, from MASTER.
-    for c, name in enumerate(PIECES + ["hand"]):
-        got = crop(cell(pix, c, 0))
-        if not got:
-            notes.append(f"MASTER {name}: empty cell - left as it was")
-            continue
-        img, left, top = got
-        if name == "hand":
-            if img != load_hand():
-                save_png(ART / "hand.png", img)
-                print("art: hand -> tools/art/hand.png")
-            continue
-        ax, ay = AX - left, AY - top
-        if (img, ax, ay) != load_piece(name):
-            dst = ART / "pieces" / f"{name}.png"
-            save_png(dst, img)
-            dst.with_suffix(".anchor").write_text(f"{ax} {ay}\n")
-            print(f"art: {name} -> tools/art/pieces/{name}.png (base centre {ax},{ay})")
-
-    # The colour table.
-    if table:
-        changed = [(i, table[i]) for i in range(14) if table[i] != rgb(i)]
-        for i, t in changed:
-            c = (t[0] // 17 << 8) | (t[1] // 17 << 4) | (t[2] // 17)
-            notes.append(f"colour table: {NAMES[i]} is #{t[0]:02X}{t[1]:02X}{t[2]:02X} "
-                         f"(game: 0x{PALETTE[i]:03X})" + ("" if take_palette else " - not applied, use --palette"))
-        if changed and take_palette:
-            apply_palette(changed)
+    # The glove.
+    got = crop(cell(pix, 6, 0))
+    if not got:
+        notes.append("MASTER hand: empty cell - left as it was")
+    elif got[0] != load_hand():
+        save_png(ART / "hand.png", got[0])
+        print("art: hand -> tools/art/hand.png")
 
     for n in notes:
         print("note:", n)
     subprocess.run([sys.executable, str(HERE / "assets.py")], check=True)
 
 
-def apply_palette(changed):
-    """Write colour-table changes into the game (Palette.cpp) and the tools (assets.py)."""
-    for i, t in changed:
-        c = (round(t[0] / 17) << 8) | (round(t[1] / 17) << 4) | round(t[2] / 17)
-        old = PALETTE[i]
-        p = ROOT / "src" / "gfx" / "Palette.cpp"
-        s = p.read_text()
-        s = re.sub(rf"0x{old:03X},(\s*// {NAMES[i]}\b)", f"0x{c:03X},\\1", s, count=1)
-        p.write_text(s, newline="\n")
-        PALETTE[i] = c
-        print(f"palette: {NAMES[i]} 0x{old:03X} -> 0x{c:03X}")
-    p = HERE / "assets.py"
-    s = p.read_text()
-    s = re.sub(r"PALETTE = \[[^\]]*\]", "PALETTE = [" + ", ".join(f"0x{v:03X}" for v in PALETTE[:8]) +
-               ",\n           " + ", ".join(f"0x{v:03X}" for v in PALETTE[8:]) + "]", s, count=1)
-    p.write_text(s, newline="\n")
+def swap_from_rows(cells, old, new, notes):
+    """MASTER is the art: what each of its colours became on each side (the
+    most common colour; the rest reported)."""
+    for side, sname in ((0, "WHITE"), (1, "BLACK")):
+        votes = {}
+        for c in range(len(PIECES)):
+            m, got = cells[c][0], cells[c][side + 1]
+            for y in range(CH):
+                for x in range(CW):
+                    if m[y][x] != TRANSPARENT:
+                        v = votes.setdefault(m[y][x], {})
+                        v[got[y][x]] = v.get(got[y][x], 0) + 1
+        for m, v in votes.items():
+            best = max(v, key=v.get)
+            stray = sum(v.values()) - v[best]
+            if stray:
+                notes.append(f"{sname}: {NAMES[m]} became {NAMES[best]} in {v[best]} pixels, something else "
+                             f"in {stray} - one colour per art colour on a side; kept {NAMES[best]}")
+            new[side][m] = best
+
+
+def swap_from_key(pix, old, new, notes):
+    """The SWAP key's squares count where the pieces left a colour as it was."""
+    for side in (0, 1):
+        y = KEY_Y + (side + 1) * KEY_STEP + KEY_SQ // 2
+        for i in range(16):
+            v = pix[y][LX + i * KEY_STEP + KEY_SQ // 2]
+            if v == TRANSPARENT or v == old[side][i]:
+                continue
+            if new[side][i] == old[side][i]:
+                new[side][i] = v
+            elif new[side][i] != v:
+                notes.append(f"{('WHITE', 'BLACK')[side]}: {NAMES[i]} - pieces say {NAMES[new[side][i]]}, "
+                             f"the key says {NAMES[v]}; took the pieces")
+
+
+# Free slots for art tones White and Black both already use, most fitting
+# first (CYAN was the glint, NAVY a body tone); felt and FX colours last.
+SPARE = (13, 11, 5, 10, 1, 12, 6, 7, 8, 9, 2, 3, 4, 14, 15, 0)
+
+
+def rebuild_from_sides(cells, notes):
+    """The WHITE and BLACK rows are the art: every pixel's pair (White's
+    colour, Black's) becomes one colour of the shared art, and the swap
+    sends it to each. The pair drawn in INK on White keeps INK (the game
+    recolours INK for its outline highlights); the others take White's
+    colour, else Black's, else a free palette slot (never drawn as itself -
+    the art is always drawn through the swap)."""
+    pairs = {}
+    for c, name in enumerate(PIECES):
+        _, w, b = cells[c]
+        if opaque(w) != opaque(b):
+            n = sum(1 for y in range(CH) for x in range(CW) if (w[y][x] == TRANSPARENT) != (b[y][x] == TRANSPARENT))
+            raise SystemExit(f"{name}: WHITE and BLACK differ in shape at {n} pixels - the two sides share one "
+                             f"set of art, so their outlines must match")
+        for y in range(CH):
+            for x in range(CW):
+                if w[y][x] != TRANSPARENT:
+                    p = (w[y][x], b[y][x])
+                    pairs[p] = pairs.get(p, 0) + 1
+    if len(pairs) > 16:
+        raise SystemExit(f"{len(pairs)} different White/Black colour pairs - the art has room for 16")
+    key, taken = {}, set()
+    ink = [p for p in pairs if p[0] == INK]
+    for p in sorted(ink, key=lambda p: -pairs[p])[:1]:
+        key[p] = INK
+        taken.add(INK)
+    for p in sorted(pairs, key=lambda p: -pairs[p]):
+        if p in key:
+            continue
+        for k in (p[0], p[1]) + SPARE:
+            if k not in taken:
+                key[p] = k
+                taken.add(k)
+                break
+    new = [list(range(16)), list(range(16))]
+    for (w, b), k in key.items():
+        new[0][k], new[1][k] = w, b
+    for (w, b), n in sorted(pairs.items(), key=lambda t: -t[1]):
+        print(f"tone {NAMES[key[(w, b)]]:<8} White {NAMES[w]:<8} Black {NAMES[b]:<8} ({n} px)")
+    for c, name in enumerate(PIECES):
+        w, b = cells[c][1], cells[c][2]
+        art = [[key[(w[y][x], b[y][x])] if w[y][x] != TRANSPARENT else TRANSPARENT for x in range(CW)]
+               for y in range(CH)]
+        img, left, top = crop(art)
+        write_piece(name, img, left, top)
+    notes.append("the art was rebuilt from the WHITE and BLACK rows (MASTER's pieces were missing or "
+                 "the side rows had new shapes); re-export to see it as MASTER")
+    return new
 
 
 def main():
@@ -336,7 +368,7 @@ def main():
     if args[0] == "export":
         export(path)
     else:
-        import_(path, "--palette" in sys.argv)
+        import_(path)
 
 
 if __name__ == "__main__":

@@ -720,8 +720,7 @@ static void drawFinger(uint32_t frame) {
     int bob = (fx::isin((int)(frame >> 3) * 40) * 2) >> 8;
     if (tapT) bob = (tapT < 6 ? tapT : 12 - tapT) / 2;
     bob = zoomed(bob);
-    int w = HAND[0], h = HAND[1];
-    sprite4(HAND, x - zoomed(w / 2), y - zoomed(h) + bob - 1, humanTurn ? RM_ID : RM_CPU, 0, zscale());
+    sprite4(HAND, x - zoomed(HAND_TIP), y - zoomed(HAND[1]) + bob - 1, humanTurn ? RM_ID : RM_CPU, 0, zscale());
 }
 
 // ---------------------------------------------------------------------------

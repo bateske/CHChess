@@ -5,4 +5,5 @@
 struct PieceArt { const uint8_t *data; int8_t ax, ay; };   // span4 art, base centre
 extern const PieceArt PIECE_ART[6];                          // pawn, knight, bishop, rook, queen, king
 extern const uint8_t SIDE_REMAP[2][16];                      // art colour -> White's, Black's (tools/art/sides.txt)
-extern const uint8_t HAND[];                                 // span4, fingertip at bottom centre
+extern const uint8_t HAND[];                                 // span4, fingertip on the bottom row
+constexpr uint8_t HAND_TIP = 5;                           // its column

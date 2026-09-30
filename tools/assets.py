@@ -41,11 +41,11 @@ NAMES = ["INK", "WHITE", "FELT_DK", "FELT", "FELT_LT", "SILVER", "RED", "WINE",
          "GOLD", "WOOD", "BLUE", "NAVY", "SKIN", "CYAN", "FX_A", "FX_B"]
 SIDES = ART / "sides.txt"
 SIDES_HEADER = """# The palette swap that dresses the one set of piece art as each side.
-# The art (tools/art/pieces/, else tools/art/gen/) is drawn in neutral
-# tones - body BLUE, NAVY, SILVER, WHITE from dark to light, a CYAN glint,
-# INK outline, GOLD and WOOD trim. One line per art colour the swap
-# changes: the art colour, then White's colour, then Black's (names as in
-# src/gfx/Palette.h). Colours not listed stay as drawn.
+# The art (tools/art/pieces/, else tools/art/gen/) is drawn in its own
+# tones - the MASTER row of tools/sheet.py's sheet - with an INK outline.
+# One line per art colour the swap changes: the art colour, then White's
+# colour, then Black's (names as in src/gfx/Palette.h). Colours not listed
+# stay as drawn.
 #
 # tools/sheet.py import rewrites this from an edited sheet.
 """
@@ -230,7 +230,9 @@ def main():
     hand = load_hand()
     data = pack_span4(hand)
     defs.append(c_array("HAND", data))
-    decls.append("extern const uint8_t HAND[];                                 // span4, fingertip at bottom centre")
+    tip = [x for x, v in enumerate(hand[-1]) if v != TRANSPARENT]
+    decls.append("extern const uint8_t HAND[];                                 // span4, fingertip on the bottom row\n"
+                 f"constexpr uint8_t HAND_TIP = {(tip[0] + tip[-1]) // 2};                           // its column")
     total += len(data)
     preview("hand", hand, 8)
 
