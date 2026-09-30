@@ -26,6 +26,8 @@ static const uint8_t RM_ID[16] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 
 static const uint8_t RM_CPU[16] = {0, 1, 2, 3, 4, 5, 6, 7, RED, WINE, 10, 11, 12, 13, 14, 15};   // the CPU's red glove
 static const uint8_t RM_HIT[16] = {INK, WHITE, WHITE, WHITE, WHITE, WHITE, WHITE, WHITE,
                                    WHITE, WHITE, WHITE, WHITE, WHITE, WHITE, WHITE, WHITE};   // struck: a white flash
+static const uint8_t RM_PREY[16] = {INK, RED, RED, RED, RED, RED, RED, RED,
+                                    RED, RED, RED, RED, RED, RED, RED, RED};         // about to be: a red one
 
 static const uint8_t *remapFor(uint8_t p) { return SIDE_REMAP[(p & eng::BLACK) ? 1 : 0]; }
 static const PieceArt &art(uint8_t p) { return PIECE_ART[(p & eng::TYPE) - 1]; }
@@ -148,19 +150,16 @@ static void stepCamera() {
     sprX += sprVX; sprY += sprVY;
     if (!sprDX && sprX > -16 && sprX < 16 && sprVX > -8 && sprVX < 8) sprX = sprVX = 0;
     if (!sprDY && sprY > -16 && sprY < 16 && sprVY > -8 && sprVY < 8) sprY = sprVY = 0;
+    int ox = cam.x, oy = cam.y;
     cam.x = (int)(cx16 >> 4) + (sprX >> 4);
     cam.y = (int)(cy16 >> 4) + (sprY >> 4);
+    fx::scroll(ox - cam.x, oy - cam.y);          // particles stay where they are on the board
 }
 
 // Height of the piece on a square (finger tip rests just above it).
 static int topOf(uint8_t sq) {
     uint8_t p = shown[sq];
     return zoomed(p ? art(p).ay + 1 : 2);
-}
-
-static uint8_t pieceValue(uint8_t p) {
-    static const uint8_t V[7] = {0, 1, 3, 3, 5, 9, 0};
-    return V[p & eng::TYPE];
 }
 
 static void fingerTo(uint8_t sq) {
@@ -221,9 +220,6 @@ void select(uint8_t sq, const uint8_t *to, const uint8_t *cap, uint8_t n) {
     memcpy(tgt, to, n);
     memcpy(tgtCap, cap, n);
     audio::sfx(Sfx::Select);
-    int x, y;
-    screenOf(sq, x, y);
-    fx::burst(fx::STAR, x, y - zoomed(art(shown[sq]).ay / 2 + 3), 8, 22, fx::RAINBOW);   // from the piece's middle
 }
 
 void deselect() {
@@ -372,11 +368,17 @@ static void announce(const match::Event &e) {
 
 static const uint8_t ANN_FRAMES = 120;
 
+// A puff off the square a piece lands on: its own surface kicked up, a
+// shade lighter (light felt off the dark squares, white off the light).
+static void dust(uint8_t sq, int x, int y, uint8_t n, int speed) {
+    fx::burst(fx::DUST, x, y, n, zoomed(speed), ((sq >> 3) + sq) & 1 ? WHITE : FELT_LT);
+}
+
 static void land(Mover &m, bool main) {
     m.on = 0;
     int x, y;
     screenOf(m.to, x, y);
-    if (!main) { shown[m.to] = m.piece; fx::burst(fx::DUST, x, y, 12, zoomed(24), SILVER); return; }
+    if (!main) { shown[m.to] = m.piece; dust(m.to, x, y, 12, 24); return; }
     const match::Event &e = pending;
     uint8_t piece = e.promo ? (uint8_t)(e.promo | (e.piece & eng::BLACK)) : e.piece;
     int up = zoomed(14);
@@ -394,14 +396,11 @@ static void land(Mover &m, bool main) {
         fx::burst(fx::STAR, x, y - up / 2, 4, 24, WHITE);
         fx::shake(10, 2);
         audio::sfx(Sfx::Capture);
-        char buf[6] = "+";
-        fmtInt(buf + 1, pieceValue(e.captured));
-        fx::floatText(buf, x, y - up - 6, GOLD);
     } else {
         fx::shake(4, 1);
         audio::sfx(Sfx::Land);
     }
-    fx::burst(fx::DUST, x, y, 16, zoomed(30), SILVER);
+    dust(m.to, x, y, 16, 30);
     shown[m.to] = piece;
     if (e.promo) {
         fx::burst(fx::STAR, x, y - up, 12, 36, GOLD);
@@ -682,19 +681,19 @@ static void drawPieces(uint32_t frame) {
                 continue;
             }
             // Outlines: picked up, the rainbow; under the glove, fading black to
-            // white (FX_A in the palette's HOVER mode); the piece the glove
-            // would take, red. Others that can be taken flash white.
+            // white (FX_A in the palette's HOVER mode). Pieces that can be
+            // taken flash white - the one the glove would take, red.
             const uint8_t *rm = nullptr;
             uint8_t hl[16], edge = 0xFF;
             bool cap = false, prey = sel != 0xFF && isTarget(sq, cap) && cap;
             if (humanTurn && sq == sel) edge = fx::RAIN[(frame >> 3) % 5];
-            else if (humanTurn && sq == cur) edge = prey ? RED : FX_A;
+            else if (humanTurn && sq == cur && !prey) edge = FX_A;
             if (edge != 0xFF) {
                 memcpy(hl, remapFor(p), 16);
                 hl[INK] = edge;
                 rm = hl;
             } else if (prey && (frame & 8)) {
-                rm = RM_HIT;
+                rm = humanTurn && sq == cur ? RM_PREY : RM_HIT;
             }
             if (sq == sel) {
                 fillEllipse(x, y, zoomed(3), (tileH + 2) / 5, INK);
@@ -853,7 +852,6 @@ bool render(uint32_t frame, uint32_t ui) {
     drawFinger(frame);
     drawHud(frame);
     fx::drawParticles((uint8_t)((2 * tileH + 2) / 5));
-    fx::drawFloats();
     fx::drawBanner();
     fx::applyShake(10, 127);
     return true;
@@ -864,7 +862,7 @@ bool render(uint32_t frame, uint32_t ui) {
 // averaged over 8 draws of the current scene.
 static void profTable(uint32_t) { drawTable(); }
 static void profBoard(uint32_t) { drawBoard(); }
-static void profFx(uint32_t) { fx::drawParticles(2); fx::drawFloats(); fx::drawBanner(); }
+static void profFx(uint32_t) { fx::drawParticles(2); fx::drawBanner(); }
 void profile(uint32_t *us) {
     static void (*const PART[6])(uint32_t) = {profTable, profBoard, drawOverlays, drawPieces, drawHud, profFx};
     for (int k = 0; k < 6; k++) {

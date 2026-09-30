@@ -27,11 +27,10 @@ enum BannerStyle : uint8_t { B_RAINBOW, B_GOLD, B_RED, B_CYAN, B_WHITE };
 void banner(const char *text, BannerStyle s, int cy, uint8_t frames = 70);
 bool bannerActive();
 
-void floatText(const char *text, int x, int y, uint8_t colour);
 void shake(uint8_t frames, uint8_t amplitude);
 
-// Vertical extent of everything transient on screen (particles, floats,
-// banner, shake). Returns false if nothing is moving.
+// Vertical extent of everything transient on screen (particles, banner,
+// shake). Returns false if nothing is moving.
 bool activeRows(int &lo, int &hi);
 
 void clear();
@@ -39,10 +38,9 @@ void update();                      // once per frame
 // dust: the size of a DUST puff (2 at the board's usual size, more zoomed in).
 void drawParticles(uint8_t dust);
 bool particles();                    // any still flying
-constexpr uint8_t RAINBOW = 0xFF;    // particle colour: cycling through RAIN
+void scroll(int dx, int dy);         // move them all (with the camera, so they keep their place)
 extern const uint8_t RAIN[5];        // the casino rainbow: red, gold, green, cyan, blue
 void drawBanner();
-void drawFloats();
 void applyShake(int y0, int y1);    // post-process rows y0..y1 of the framebuffer
 
 }  // namespace fx

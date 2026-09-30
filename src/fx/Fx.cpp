@@ -64,6 +64,10 @@ bool particles() {
     return false;
 }
 
+void scroll(int dx, int dy) {
+    for (auto &p : parts) { p.x = (int16_t)(p.x + dx * 16); p.y = (int16_t)(p.y + dy * 16); }
+}
+
 void spawn(Kind k, int x, int y, int vx, int vy, uint8_t life, uint8_t colour) {
     Particle *slot = nullptr;
     for (auto &p : parts) if (!p.life) { slot = &p; break; }
@@ -114,7 +118,7 @@ void drawParticles(uint8_t dust) {
     for (auto &p : parts) {
         if (!p.life) continue;
         int x = p.x >> 4, y = p.y >> 4;
-        uint8_t c = p.colour == RAINBOW ? RAIN[((p.age >> 2) + (&p - parts)) % 5] : p.colour;
+        uint8_t c = p.colour;
         switch (p.kind) {
             case SPARK:
                 gfx_pixel(x, y, c);
@@ -128,9 +132,9 @@ void drawParticles(uint8_t dust) {
             case STAR:
                 gfx_hline(x - 1, y, 3, c); gfx_vline(x, y - 1, 3, c);
                 break;
-            case DUST: {                                  // a puff, down to a speck
+            case DUST: {                                  // a puff, down to a speck, centred
                 int s = p.life > 10 ? dust : (p.life > 4 || (p.life & 1)) ? (dust + 1) / 2 : 0;
-                gfx_fillRect(x, y, s, s, c);
+                gfx_fillRect(x - s / 2, y - s / 2, s, s, c);
                 break;
             }
         }
@@ -182,29 +186,8 @@ void drawBanner() {
 }
 
 // ---------------------------------------------------------------------------
-// Floating text and shake
+// Shake
 // ---------------------------------------------------------------------------
-struct Float { int16_t x, y; uint8_t t, colour; char text[8]; };
-static Float floats[4];
-
-void floatText(const char *text, int x, int y, uint8_t colour) {
-    Float *f = &floats[0];
-    for (auto &q : floats) if (!q.t) { f = &q; break; }
-    f->x = (int16_t)x; f->y = (int16_t)y; f->t = 50; f->colour = colour;
-    strncpy(f->text, text, 7); f->text[7] = 0;
-}
-
-void drawFloats() {
-    for (auto &f : floats) {
-        if (!f.t) continue;
-        int y = f.y - (50 - f.t) / 2;
-        int x = f.x - text35Width(f.text) / 2;
-        if (f.t < 8 && (f.t & 1)) continue;
-        text35(x + 1, y + 1, f.text, INK);
-        text35(x, y, f.text, f.colour);
-    }
-}
-
 static uint8_t shakeT, shakeAmp;
 
 void shake(uint8_t frames, uint8_t amp) { shakeT = frames; shakeAmp = amp; }
@@ -242,14 +225,12 @@ bool activeRows(int &lo, int &hi) {
     lo = 999; hi = -1;
     if (shakeT) { lo = 0; hi = 127; return true; }
     for (auto &p : parts) if (p.life) { int y = p.y >> 4; if (y - 2 < lo) lo = y - 2; if (y + 3 > hi) hi = y + 3; }
-    for (auto &f : floats) if (f.t) { int y = f.y - (50 - f.t) / 2; if (y - 1 < lo) lo = y - 1; if (y + 7 > hi) hi = y + 7; }
     if (bannerFrames) { if (bannerCy - 18 < lo) lo = bannerCy - 18; if (bannerCy + 18 > hi) hi = bannerCy + 18; }
     return hi >= lo;
 }
 
 void clear() {
     memset(parts, 0, sizeof parts);
-    memset(floats, 0, sizeof floats);
     bannerFrames = 0;
     shakeT = 0;
 }
@@ -257,7 +238,6 @@ void clear() {
 void update() {
     updateParticles();
     if (bannerFrames) { bannerFrames--; bannerT++; }
-    for (auto &f : floats) if (f.t) f.t--;
     if (shakeT) shakeT--;
 }
 

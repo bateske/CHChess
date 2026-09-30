@@ -94,7 +94,7 @@ re-uploading.
 
 * **The engine** (ch2k, ~12 KB) is ArduChess's: a 0x88 board with fully
   legal move generation, alpha-beta with quiescence search, a Texel-tuned
-  evaluation and an opening book, cut here to two plies. It runs
+  evaluation and an opening book, cut here to four plies. It runs
   synchronously; every 8 nodes it calls back into the game, which keeps
   the game running while it thinks (the CPU's glove, the camera, the
   spinning chip), drawn at 20 fps so the search keeps most of the CPU.
