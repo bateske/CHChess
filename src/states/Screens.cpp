@@ -238,15 +238,20 @@ static void arrows(int y, int w, bool on, uint32_t frame) {
     text35(64 + w / 2 + 6 + bob, y + 1, ">", GOLD);
 }
 
+// A setup choice: boxed while chosen, with arrows to change it.
+static void choice(int y, const char *s, bool on, uint32_t frame) {
+    int w = text35x2Width(s);
+    if (on) fillRound(64 - w / 2 - 5, y - 3, w + 10, 15, 3, NAVY);
+    centred2(y, s, on ? GOLD : WHITE);
+    arrows(y + 2, w, on, frame);
+}
+
 static void setupRender(uint32_t frame) {
     feltBackdrop();
     title35("OPPONENT", 10, 3, FX_B, GOLD, WOOD, WINE, 13);
     // Stars for how hard they play.
     for (int i = 0; i <= opt.level; i++) text35(64 - opt.level * 4 + i * 8, 36, "*", FX_B);
-    int w = text35x2Width(OPPONENT[opt.level]);
-    if (sel == 0) fillRound(64 - w / 2 - 5, 48, w + 10, 15, 3, NAVY);
-    centred2(51, OPPONENT[opt.level], sel == 0 ? GOLD : WHITE);
-    arrows(53, w, sel == 0, frame);
+    choice(51, OPPONENT[opt.level], sel == 0, frame);
     centred35(66, OPP_LINE[opt.level], FELT_LT);
     // Your record against them.
     char buf[24], *p = fmtStr(buf, "WON ");
@@ -256,10 +261,7 @@ static void setupRender(uint32_t frame) {
     centred35(72, buf, GOLD);
 
     static const char *const SIDE[3] = {"PLAY WHITE", "PLAY BLACK", "RANDOM SIDE"};
-    w = text35x2Width(SIDE[opt.side]);
-    if (sel == 1) fillRound(64 - w / 2 - 5, 78, w + 10, 15, 3, NAVY);
-    centred2(81, SIDE[opt.side], sel == 1 ? GOLD : WHITE);
-    arrows(83, w, sel == 1, frame);
+    choice(81, SIDE[opt.side], sel == 1, frame);
     menuItem(104, "DEAL ME IN", sel == 2, frame);
 }
 
@@ -279,9 +281,14 @@ static void tryTarget(uint8_t sq) {
 
 // A tap of B puts a piece back down. Held (or with a direction), it
 // inspects the board: the camera zooms right in and the D-pad pushes the
-// view to the board's edges and corners until B is let go.
+// view to the board's edges and corners until B is let go. Holding a piece,
+// a tap is anything up to HOLD_B frames, while a bar grows under the HUD.
+static const uint8_t HOLD_B = 32;
 static bool bUsed;
 static uint8_t bHeld;
+static uint8_t holdBar() {
+    return bHeld && !bUsed && stage::selected() != 0xFF ? (uint8_t)(bHeld * (128 / HOLD_B)) : 0;
+}
 static void lookAround() {
     if (arduboy.justPressed(B_BUTTON)) bUsed = false;
     bHeld = arduboy.pressed(B_BUTTON) ? (uint8_t)(bHeld < 255 ? bHeld + 1 : 255) : 0;
@@ -291,7 +298,7 @@ static void lookAround() {
         if (arduboy.pressed(RIGHT_BUTTON)) dx = 1;
         if (arduboy.pressed(UP_BUTTON)) dy = -1;
         if (arduboy.pressed(DOWN_BUTTON)) dy = 1;
-        if (dx || dy || bHeld > 8) bUsed = true;
+        if (dx || dy || bHeld > (stage::selected() != 0xFF ? HOLD_B : 8)) bUsed = true;
     }
     stage::inspect(bHeld && bUsed, dx, dy);
 }
@@ -471,6 +478,10 @@ static void playUpdate(bool thinking) {
             break;
         default:
             lookAround();
+            if (stage::checkShown()) {
+                if (arduboy.justPressedMask()) { stage::acknowledge(); audio::sfx(Sfx::Select); }
+                break;
+            }
             if (arduboy.justPressed(START_BUTTON) && !bHeld) { overlay = PAUSE; sel = 0; audio::sfx(Sfx::Select); break; }
             if (arduboy.justPressed(SELECT_BUTTON) && !bHeld) cycleView();
             if (match::humanToMove() && !stage::busy()) playInput();
@@ -496,9 +507,11 @@ static void panel(int y, int h) {
 }
 
 static void playRender(uint32_t frame) {
-    uint32_t ui = overlay | (sel << 4) | (promoSel << 8);
+    uint8_t bar = overlay ? 0 : holdBar();
+    uint32_t ui = overlay | (sel << 4) | (promoSel << 8) | ((uint32_t)bar << 16);
     if (overlay) ui ^= (frame >> 3) << 12;            // blinking arrows and borders
     if (!stage::render(frame, ui)) return;
+    gfx_fillRect(0, 10, bar, 2, CYAN);                // B held: how long till it inspects
     if (overlay == PAUSE) {
         panel(32, 64);
         for (uint8_t i = 0; i < 4; i++) {
@@ -517,8 +530,7 @@ static void playRender(uint32_t frame) {
         gfx_fillRect(44, 38, 40, 52, INK);
         gfx_rect(43, 37, 42, 54, GOLD);
         stage::drawPieceAt((uint8_t)(P[promoSel] | colour), 64, 82);
-        text35(34, 60, "<", (frame & 8) ? FX_B : GOLD);
-        text35(91, 60, ">", (frame & 8) ? FX_B : GOLD);
+        arrows(59, 42, true, frame);
         centred35(94, N[promoSel], WHITE);
     } else if (overlay == RESULT) {
         panel(84, 40);
@@ -678,8 +690,13 @@ static bool debugHook(char cmd, const char *args) {
             dbg::print(buf);
             return true;
         }
+        case 'V':
         case 'X': {
-            match::Setup s = {match::TWO_PLAYER, 0, 0, 1};
+            // X <fen>: two players from a position; V <fen>: you, the side to
+            // move, against the CPU (BEGINNER).
+            const char *sp = strchr(args, ' ');
+            match::Setup s = {cmd == 'V' ? (uint8_t)match::VS_CPU : (uint8_t)match::TWO_PLAYER,
+                              (uint8_t)(sp && sp[1] == 'b'), 0, 1};
             match::startFen(s, args);
             overlay = NONE; statsCounted = false;
             enter(Scr::Play);
@@ -694,6 +711,7 @@ static bool debugHook(char cmd, const char *args) {
 // profile and the think report never touch the game, so they run at once.
 static bool searching(char cmd) {
     if (cmd == 'Y' || cmd == 'W') return false;
+    if (stage::checkShown()) stage::acknowledge();        // a scripted command answers CHECK! as a press would
     return match::cpuThinking() || (cur == Scr::Play && match::active() && !match::humanToMove());
 }
 #endif

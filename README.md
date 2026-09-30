@@ -52,7 +52,7 @@ any CHGame package:
 | D-pad | move the glove between your pieces, or, holding one, between the squares it can go to | menus |
 | A | pick up the piece / put it down there | select |
 | B | put the piece back | back |
-| B held (+ D-pad) | inspect: the camera zooms right in; the D-pad pushes the view to the board's edges and corners until you let go | |
+| B held (+ D-pad) | inspect: the camera zooms right in; the D-pad pushes the view to the board's edges and corners until you let go (holding a piece, a bar under the top line fills first: let go before it is full and the piece goes back) | |
 | SELECT | change view: the board, or the map (from above) | |
 | START | pause: resume, undo, resign, save + quit | |
 
@@ -67,10 +67,10 @@ at the foot of the screen names what it is on ("KNIGHT G1", "BISHOP F1 NO
 MOVES", "KNIGHT TO F3", "KNIGHT TAKES PAWN"), then calls out each move as
 it lands. During your turn the other side's last move is lit in gold.
 
-Check is an event: the king's square marches red, the king flashes red on
-a heartbeat, your glove turns red, the board's trim and the top bar go
-from gold to red, and the glove only stops on the pieces that can get you
-out of it. The camera leans towards
+Check is an event: CHECK! stays up until you press a button (the only
+thing that stops play), the king's square marches red, the king's body
+beats red, lub-dub, until you pick it up, and the glove only stops on the
+pieces that can get you out of it. The camera leans towards
 the middle of the board, so the selection is always in view without empty
 carpet at the edges.
 

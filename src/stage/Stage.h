@@ -26,6 +26,8 @@ bool flipped();                      // viewing from Black's side
 void select(uint8_t sq, const uint8_t *to, const uint8_t *cap, uint8_t n);
 void deselect();
 uint8_t selected();                  // 0xFF: none
+bool checkShown();                   // CHECK! against the player, waiting for a button
+void acknowledge();                  // ... pressed
 void setBlocked(bool b);             // the piece under the glove has no move (the plate says so)
 // Views: the iso board and the flat map. The iso camera whips in close on
 // each move (not at QUICK pace) and pulls back out.

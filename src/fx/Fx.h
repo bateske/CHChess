@@ -25,6 +25,7 @@ bool particlesAlive();
 // Big centred lettering with an outline; pops in, holds, fades.
 enum BannerStyle : uint8_t { B_RAINBOW, B_GOLD, B_RED, B_CYAN, B_WHITE };
 void banner(const char *text, BannerStyle s, int cy, uint8_t frames = 70);
+void holdBanner(bool on);            // keep the banner up (before it blinks out) until false
 bool bannerActive();
 
 void shake(uint8_t frames, uint8_t amplitude);

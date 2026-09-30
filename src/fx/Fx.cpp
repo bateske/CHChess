@@ -145,15 +145,18 @@ void drawParticles(uint8_t dust) {
 // Banner
 // ---------------------------------------------------------------------------
 static char bannerText[14];
-static uint8_t bannerStyle, bannerLen, bannerT, bannerFrames;
+static uint8_t bannerStyle, bannerT, bannerFrames;
 static int bannerCy;
+static bool bannerHeld;
 
 void banner(const char *text, BannerStyle s, int cy, uint8_t frames) {
     strncpy(bannerText, text, sizeof bannerText - 1);
     bannerText[sizeof bannerText - 1] = 0;
     bannerStyle = s; bannerCy = cy; bannerT = 0; bannerFrames = frames;
-    bannerLen = frames;
+    bannerHeld = false;
 }
+
+void holdBanner(bool on) { bannerHeld = on; }
 
 bool bannerActive() { return bannerFrames != 0; }
 
@@ -232,12 +235,16 @@ bool activeRows(int &lo, int &hi) {
 void clear() {
     memset(parts, 0, sizeof parts);
     bannerFrames = 0;
+    bannerHeld = false;
     shakeT = 0;
 }
 
 void update() {
     updateParticles();
-    if (bannerFrames) { bannerFrames--; bannerT++; }
+    if (bannerFrames) {
+        if (!bannerHeld || bannerFrames > 10) bannerFrames--;    // held: up, until let go to blink out
+        if (!++bannerT) bannerT = 128;                           // (the same phase of the dance)
+    }
     if (shakeT) shakeT--;
 }
 

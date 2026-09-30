@@ -1,0 +1,61 @@
+# Check waits for a press, the heartbeat under the glove, the B hold bar.
+# Two players, ...Bb4+: White is in check.
+say X rnbqkbnr/pppp1ppp/8/4p3/3PP3/8/PPP2PPP/RNBQKBNR b KQkq -
+wait 12
+say M 61 25
+wait 90
+snap chk_banner
+wait 200
+snap chk_still
+wait 200
+snap chk_still2
+tap A
+wait 20
+snap chk_acked
+wait 80
+snap chk_turn
+tap RIGHT
+wait 6
+snap h1
+tap RIGHT
+wait 6
+snap h2
+tap LEFT
+wait 6
+snap h3
+tap LEFT
+wait 6
+snap h4
+tap DOWN
+wait 6
+snap h5
+gif hover 64 1
+# B with a piece in hand: the bar, then inspection.
+tap A
+wait 10
+snap sel
+hold B
+wait 8
+snap bar8
+wait 16
+snap bar24
+wait 12
+snap bar36
+wait 30
+snap inspect
+release
+wait 30
+snap released
+hold B
+wait 10
+release
+wait 20
+snap cancelled
+# You check the CPU: no wait.
+say V r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5Q2/PPPP1PPP/RNB1K1NR w KQkq -
+wait 12
+say M 26 53
+wait 150
+snap cpu_in_check
+wait 200
+snap cpu_answered
