@@ -10,12 +10,12 @@
 namespace iso {
 
 Cam cam = {0, 40, false};
-uint8_t zoom = 1;
+uint8_t tileH = 5;
 bool flat;
 bool coords = true;
 uint8_t darkSq = FELT, lightSq = SKIN, tableCol = NAVY, tableDot = WINE, tableShadow = INK;
 
-void setView(bool m, uint8_t z) { flat = m; zoom = z; }
+void setView(bool m) { flat = m; }
 
 void toView(uint8_t sq, bool flip, int &u, int &v) {
     int f = sq & 7, r = sq >> 3;
@@ -253,11 +253,11 @@ void drawBoard() {
     // Corners in screen space: left (a1 from White), near, right.
     int xl = -8 * hw() - cam.x + CX, yl = 8 * hh() - cam.y + CY;
     int xb = -cam.x + CX,            yb = 16 * hh() - cam.y + CY;
-    int s = slab();
+    int s = slab(), z = (tileH + 2) / 5;
 
     // Contact shadow on the carpet, then the slab.
-    leftFace(xl, yl, s + 2 + zoom, 1 + zoom, tableShadow, 0xFF);
-    rightFace(xb, yb, s + 2 + zoom, 1 + zoom, tableShadow, 0xFF);
+    leftFace(xl, yl, s + 2 + z, 1 + z, tableShadow, 0xFF);
+    rightFace(xb, yb, s + 2 + z, 1 + z, tableShadow, 0xFF);
     leftFace(xl, yl, s, 0, WINE, GOLD);
     rightFace(xb, yb, s, 0, INK, GOLD);
 
@@ -266,9 +266,9 @@ void drawBoard() {
     // Coordinates on the carpet below the near edges: files along the left
     // one, ranks along the right (reversed from Black's side).
     for (int i = 0; coords && i < 8; i++) {
-        int dx = (2 * i + 1) * hw() / 2, dy = (2 * i + 1) * hh() / 2 + s + 2 + zoom;
+        int dx = (2 * i + 1) * hw() / 2, dy = (2 * i + 1) * hh() / 2 + s + 2 + z;
         label(xl + dx - 4, yl + dy, (char)('A' + (cam.flip ? 7 - i : i)));
-        label(xb + dx + 2, yb - (2 * i + 1) * hh() / 2 + s + 2 + zoom, (char)('1' + (cam.flip ? 7 - i : i)));
+        label(xb + dx + 2, yb - (2 * i + 1) * hh() / 2 + s + 2 + z, (char)('1' + (cam.flip ? 7 - i : i)));
     }
 }
 

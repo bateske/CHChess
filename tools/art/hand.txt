@@ -1,11 +1,20 @@
-# The pointing glove (the player's; the CPU's is remapped: cuff GOLD -> RED).
-# Fingertip: bottom row, centre column. k ink, w white, s silver, y gold.
-..kkk..
-.kyyyk.
-.kkkkk.
-kwwwwwk
-kwkwkwk
-.kwwwsk
-..kwsk.
-..kwk..
-...k...
+# The pointing glove (the player's; the CPU's is remapped: cuff GOLD -> RED,
+# WOOD -> WINE): thumb on the left, the other fingers curled on the right,
+# the index finger pointing down. Fingertip: bottom row, centre column.
+# k ink, w white, s silver, y gold, b wood.
+..kkkkkkkkk..
+..kyyyyyyyk..
+..kbyyyyybk..
+..kkkkkkkkk..
+.kwwwwwwwwwk.
+.kwwwwwwwwsk.
+kwkwwwwwwwwsk
+kwwkwwwkkkksk
+.kwwwwwkwwwsk
+..kwwwwkkkksk
+..kkwwwkwwsk.
+....kwwskkk..
+....kwwsk....
+....kwwsk....
+....kwwsk....
+.....kkk.....

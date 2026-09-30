@@ -1,22 +1,22 @@
 # README GIFs (docs/). Squares: a1 = 0 .. h8 = 63.
 gif title 90 2
-# A game against the CPU: pick up the e-pawn, push it, the CPU answers.
+# A game against the CPU: step to the d-pawn, pick it up, on to d4, and
+# the camera whips in on the move; then the CPU answers.
 say G 0 0 2 7
 wait 30
+tap LEFT
+wait 8
 tap A
 wait 8
 tap UP
-tap UP
 gif select 24 2
 tap A
-gif cpu 110 2
-# The three views and the look-around spring.
+gif cpu 150 2
+# The map and back, and the look-around spring.
 tap SELECT
 gif views 40 2
 tap SELECT
 wait 20
-tap SELECT
-wait 10
 hold B+RIGHT
 gif spring 30 2
 release

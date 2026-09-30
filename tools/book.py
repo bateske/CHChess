@@ -1,7 +1,7 @@
 """Trim ch2k's opening book to fewer plies.
 
     python tools/book.py            # sizes at each depth
-    python tools/book.py 4          # rewrite the OPENING_BOOK array in src/engine/ch2k.hpp at depth 4
+    python tools/book.py 3          # rewrite the OPENING_BOOK array in src/engine/ch2k.hpp at depth 3
 
 The book is a tree of moves serialised depth first, one byte a move: bits
 0-5 index the move in gen_moves() order, bit 7 = children follow, bit 6 =
@@ -58,7 +58,9 @@ def main():
     emit(root, 0, d, out)
     rows = ",\n".join("    " + ", ".join(f"{v:3d}" for v in out[i:i + 8]) for i in range(0, len(out), 8))
     new = f"static u8 const OPENING_BOOK[{len(out)}] PROGMEM =\n{{\n{rows},\n}};"
-    HPP.write_text(t[:m.start()] + new + t[m.end():], newline="\n")
+    t = t[:m.start()] + new + t[m.end():]
+    t = re.sub(r"(OPENING_BOOK_MAX_DEPTH = )\d+", lambda g: g.group(1) + str(d), t)
+    HPP.write_text(t, newline="\n")
     print(f"book cut to depth {d}: {len(out)} bytes")
 
 

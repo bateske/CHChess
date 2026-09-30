@@ -52,7 +52,7 @@ uint32_t *frameStackLo, *frameStackHi;
 #endif
 
 bool (*hook)(char cmd, const char *args) = nullptr;
-bool (*holdGame)() = nullptr;
+bool (*holdGame)(char cmd) = nullptr;
 static char held[100];               // a game command waiting for the search to end
 
 static char line[100];
@@ -191,7 +191,7 @@ static void execute() {
 #endif
         default:
             // Mid-search: answer HELD now, OK/ERR once it has run.
-            if (holdGame && holdGame()) { memcpy(held, line, sizeof held); print("HELD\n"); break; }
+            if (holdGame && holdGame(cmd)) { memcpy(held, line, sizeof held); print("HELD\n"); break; }
             print(hook && hook(cmd, args) ? "OK\n" : "ERR\n");
             break;
     }
@@ -204,7 +204,7 @@ void waitInput() {
 }
 
 void poll() {
-    if (held[0] && !(holdGame && holdGame())) {
+    if (held[0] && !(holdGame && holdGame(held[0]))) {
         const char *args = held + 1;
         while (*args == ' ') args++;
         print(hook && hook(held[0], args) ? "OK\n" : "ERR\n");

@@ -4,14 +4,16 @@ Chess for the [CHGame](https://github.com/bateske/CH32SerialBoot) handheld
 (CH32X035 RISC-V, 128x128 colour LCD, piezo), in the casino style of
 [CHBlackjack](https://github.com/bateske/CHBlackjack): an isometric board on
 a casino carpet, a pointing glove to pick pieces up, legal moves lit with
-shimmering, marching borders, captured pieces knocked off the board
-tumbling, CHECK! and CHECKMATE! in Blackjack's dancing gradient letters, and
-a CPU opponent whose red glove hovers over the pieces it is thinking about.
+shimmering, marching borders, a camera that whips in close on every move
+and pulls back out, each move called out ("ROOK TAKES QUEEN ON A4"),
+captured pieces knocked off the board tumbling, CHECK! and CHECKMATE! in
+Blackjack's dancing gradient letters, and a CPU opponent whose red glove
+hovers over the pieces it is thinking about.
 
 | The CPU's turn | Capture | Checkmate |
 |---|---|---|
 | ![cpu](docs/cpu.gif) | ![capture](docs/capture.gif) | ![mate](docs/mate.gif) |
-| **Title** | **Close-up, look around** | **Promotion** |
+| **Title** | **Look around** | **Promotion** |
 | ![title](docs/title.gif) | ![spring](docs/spring.gif) | ![promote](docs/promote.gif) |
 
 (Captured from the PC simulator in `tools/chsim`, which runs the real game
@@ -33,7 +35,7 @@ You need the Arduino IDE (2.x) or `arduino-cli`, and:
 3. **This repository**, in a folder named `CHChess`.
 
 The game needs **link-time optimisation** to fit the 50,944-byte application
-region (it is 49.1 KB with it, 54.8 KB without). With a board package that
+region (it is 50.3 KB with it, 56.1 KB without). With a board package that
 has it, pick *Tools > Optimize > Smallest + LTO*. From the command line, on
 any CHGame package:
 
@@ -46,17 +48,22 @@ any CHGame package:
 
 | Button | On the board | Elsewhere |
 |---|---|---|
-| D-pad | move the glove one square (along the board's diagonals) | menus |
-| A | pick up your piece / put it down on a lit square | select |
+| D-pad | move the glove between your pieces that can move, or, holding one, between the squares it can go to | menus |
+| A | pick up the piece / put it down there | select |
 | B | put the piece back | back |
 | B + D-pad | look around: the camera springs that way until you let go | |
-| SELECT | change view: board, close-up (2x), map (from above) | |
+| SELECT | change view: the board, or the map (from above) | |
 | START | pause: resume, undo, resign, save + quit | |
 
-On the board the D-pad follows the board's own axes, the way tactics games
-do: UP is towards the far side (up and right on screen), RIGHT is along your
-back rank (down and right). The camera leans towards the middle of the
-board, so the selection is always in view without empty carpet at the edges.
+The glove only ever stops where something can happen. Each press takes it
+to the nearest spot in that direction as the screen shows it (diagonals
+included, whatever the view); with nothing that way it wraps round to the
+farthest spot the other way, so pressing on steps through them all. A plate
+at the foot of the screen names what it is on ("KNIGHT G1", "KNIGHT TO F3",
+"KNIGHT TAKES PAWN"), then calls out each move as it lands. During your
+turn the other side's last move is lit in gold. The camera leans towards
+the middle of the board, so the selection is always in view without empty
+carpet at the edges.
 
 Play one or two players. Against the CPU, choose your side and one of five
 opponents:
@@ -73,7 +80,8 @@ The weaker opponents choose at random among moves within a margin of the
 best one, so they make human-looking mistakes rather than random blunders.
 Your record against each is on the opponent screen (hold SELECT there to
 clear it). Options: sound, board colour (green, blue, red, purple felt),
-move hints, coordinates, and the CPU's pace. Options, records and a game in
+move hints, coordinates, and the pace (QUICK: faster CPU turns and moves,
+and no zooming in on them). Options, records and a game in
 progress (SAVE + QUIT, then CONTINUE) are saved to flash and survive
 re-uploading.
 
@@ -81,14 +89,15 @@ re-uploading.
 
 * **The engine** (ch2k, ~12 KB) is ArduChess's: a 0x88 board with fully
   legal move generation, alpha-beta with quiescence search, a Texel-tuned
-  evaluation and an opening book, cut here to four plies. It runs
+  evaluation and an opening book, cut here to three plies. It runs
   synchronously; every 8 nodes it calls back into the game, which keeps
   the game running while it thinks (the CPU's glove, the camera, the
   spinning chip), drawn at 20 fps so the search keeps most of the CPU.
 * **The board** is drawn as 2:1 diamonds sampled at pixel centres, so every
-  edge is a clean staircase at both zoom levels; pieces are span-encoded
-  sprites rendered from 3D models (`tools/pieces.py`), recoloured for each
-  side, doubled for the close-up and stood on a flat grid for the map.
+  edge is a clean staircase at every zoom step (tiles 20x10 up to 40x20, a
+  pixel at a time); pieces are span-encoded sprites rendered from 3D models
+  (`tools/pieces.py`), one set recoloured for each side, scaled as the
+  camera zooms and stood on a flat grid for the map.
 * **Undo and saved games** replay the move list from the start (or from a
   snapshot, in long games), which also keeps the opening book and the
   repetition rule right.

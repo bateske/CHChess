@@ -57,41 +57,53 @@ static inline __attribute__((always_inline)) void fillRun(uint8_t *row, int a, i
     if (len) *p = (uint8_t)((*p & 0xF0) | c);
 }
 
-RAMFUNC(sprite4) void sprite4(const uint8_t *d, int x, int y, const uint8_t *remap, uint8_t flags) {
+// A ghosted run: every other pixel, checkerboard (pieces in front of the
+// cursor).
+RAMFUNC(ghostrun) static void ghostRun(uint8_t *row, int a, int e, int y, uint8_t c) {
+    for (int k = a + ((a + y) & 1); k < e; k += 2)
+        if ((unsigned)k < GFX_W) plot(row + (k >> 1), k, c);
+}
+
+// One run of a sprite row.
+static inline __attribute__((always_inline)) void spriteRun(uint8_t *row, int a, int e, int y, uint8_t c, bool ghost) {
+    if (!ghost) fillRun(row, a, e - a, c);
+    else ghostRun(row, a, e, y, c);
+}
+
+RAMFUNC(sprite4) void sprite4(const uint8_t *d, int x, int y, const uint8_t *remap, uint8_t flags, int scale) {
     uint8_t w = d[0], h = d[1];
     d += 2;
     bool mirror = flags & SPR_MIRROR, ghost = flags & SPR_GHOST;
-    int s = (flags & SPR_2X) ? 2 : 1;           // doubled: every pixel a 2x2 block
     for (int j = 0; j < h; j++) {
         uint8_t n = *d++;
         const uint8_t *runs = d;
         d += n;
-        for (int rep = 0; rep < s; rep++, y++) {
-            if ((unsigned)y >= GFX_H) continue;
-            uint8_t *row = gfx_fb + y * GFX_FB_STRIDE;
-            // Walk the runs with a running x; mirrored, backwards from the
-            // row's right end (trailing transparency is implicit).
-            int q = x, step = 1;
-            const uint8_t *r = runs;
-            if (mirror) {
-                int used = 0;
-                for (uint8_t i = 0; i < n; i++) used += (runs[i] >> 4) + 1;
-                q += (w - used) * s;
-                r += n - 1; step = -1;
-            }
-            for (uint8_t i = 0; i < n; i++, r += step) {
-                uint8_t b = *r;
-                int len = ((b >> 4) + 1) * s;
-                uint8_t c = b & 15;
-                if (c != 15) {
-                    c = remap[c];
-                    if (!ghost) fillRun(row, q, len, c);
-                    else {
-                        for (int k = q + ((q + y) & 1); k < q + len; k += 2)
-                            if ((unsigned)k < GFX_W) plot(row + (k >> 1), k, c);
-                    }
-                }
+        if (scale == 256 && !mirror) {
+            // 1:1, facing as drawn (nearly always): a running x.
+            if ((unsigned)(y + j) >= GFX_H) continue;
+            uint8_t *row = gfx_fb + (y + j) * GFX_FB_STRIDE;
+            int q = x;
+            for (uint8_t i = 0; i < n; i++) {
+                uint8_t b = runs[i];
+                int len = (b >> 4) + 1;
+                if ((b & 15) != 15) spriteRun(row, q, q + len, y + j, remap[b & 15], ghost);
                 q += len;
+            }
+            continue;
+        }
+        // Scaled or mirrored: source row j covers screen rows [j * scale,
+        // (j + 1) * scale) >> 8, and a run [px, px + len) the columns scaled
+        // the same way (trailing transparency is implicit).
+        for (int yy = y + ((j * scale) >> 8); yy < y + (((j + 1) * scale) >> 8); yy++) {
+            if ((unsigned)yy >= GFX_H) continue;
+            uint8_t *row = gfx_fb + yy * GFX_FB_STRIDE;
+            int px = 0;
+            for (uint8_t i = 0; i < n; i++) {
+                uint8_t b = runs[i];
+                int len = (b >> 4) + 1, p0 = mirror ? w - px - len : px;
+                if ((b & 15) != 15)
+                    spriteRun(row, x + ((p0 * scale) >> 8), x + (((p0 + len) * scale) >> 8), yy, remap[b & 15], ghost);
+                px += len;
             }
         }
     }
@@ -191,18 +203,6 @@ void fillEllipse(int cx, int cy, int rx, int ry, uint8_t c) {
     for (int dy = -ry; dy <= ry; dy++) {
         int d = dx[dy < 0 ? -dy : dy];
         gfx_hline(cx - d, cy + dy, 2 * d + 1, c);
-    }
-}
-
-void ellipse(int cx, int cy, int rx, int ry, uint8_t c) {
-    const uint8_t *dx = ellipseRows(rx, ry);
-    for (int dy = -ry; dy <= ry; dy++) {
-        int a = dy < 0 ? -dy : dy;
-        int d = dx[a];
-        int inner = (a == ry) ? -d - 1 : dx[a + 1];
-        int len = d - inner; if (len < 1) len = 1;
-        gfx_hline(cx + d - len + 1, cy + dy, len, c);
-        gfx_hline(cx - d, cy + dy, len, c);
     }
 }
 

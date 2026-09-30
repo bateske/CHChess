@@ -14,10 +14,10 @@ void roundRect(int x, int y, int w, int h, uint8_t r, uint8_t c);
 
 // span4 art (tools/assets.py pack_span4): w, h, then per row a count and
 // (len-1)<<4|colour bytes, colour 15 = skip. Drawn through a remap,
-// mirrored left-right, doubled and/or ghosted (every other pixel,
-// checkerboard) - pieces in front of the cursor.
-enum : uint8_t { SPR_MIRROR = 1, SPR_GHOST = 2, SPR_2X = 4 };
-void sprite4(const uint8_t *data, int x, int y, const uint8_t *remap, uint8_t flags);
+// mirrored left-right and/or ghosted (every other pixel, checkerboard) -
+// pieces in front of the cursor - and scaled (Q8, 256 = 1:1).
+enum : uint8_t { SPR_MIRROR = 1, SPR_GHOST = 2 };
+void sprite4(const uint8_t *data, int x, int y, const uint8_t *remap, uint8_t flags, int scale = 256);
 // span4 art turned by `angle` (256 = one turn) and scaled (256 = 1:1) about
 // its pixel (ax, ay), which lands on screen (px, py). Decodes into the CHGfx
 // chunk scratch: render time only, art up to 32x60.
@@ -25,7 +25,6 @@ void spriteRot(const uint8_t *data, int ax, int ay, int px, int py, uint8_t angl
                const uint8_t *remap, bool mirror);
 
 void fillEllipse(int cx, int cy, int rx, int ry, uint8_t c);
-void ellipse(int cx, int cy, int rx, int ry, uint8_t c);
 void dither(int x, int y, int w, int h, uint8_t c, uint8_t phase);      // 50% checker
 void remapRect(int x, int y, int w, int h, const uint8_t *remap);       // recolour in place
 

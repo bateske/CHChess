@@ -17,21 +17,21 @@ bool overShown();                    // the end of the game has been shown
 // framebuffer still holds it). ui: a signature of what the caller draws on top.
 bool render(uint32_t frame, uint32_t ui);
 void invalidate();                   // redraw next frame
-void profile(uint32_t *us);          // debug builds: us per section (table, board, overlays, pieces, HUD)
+void profile(uint32_t *us);          // debug builds: us per section (table, board, overlays, pieces, HUD, fx)
 
 // The player's side of it (the play screen drives these).
 uint8_t cursor();
 void setCursor(uint8_t sq);
-void moveCursor(int du, int dv);     // in view space: +u screen down-right, +v down-left
 bool flipped();                      // viewing from Black's side
 void select(uint8_t sq, const uint8_t *to, const uint8_t *cap, uint8_t n);
 void deselect();
 uint8_t selected();                  // 0xFF: none
-void deny(uint8_t sq);               // the piece shakes its head
-// Views: the iso board (20x10 tiles), a 2x close-up, and the flat map.
-enum View : uint8_t { NORMAL, CLOSE, MAP, VIEWS };
+// Views: the iso board and the flat map. The iso camera whips in close on
+// each move (not at QUICK pace) and pulls back out.
+enum View : uint8_t { NORMAL, MAP, VIEWS };
 uint8_t view();
 void setView(uint8_t v);
+void setZoom(uint8_t tileH);         // iso zoom now, 5..10 (the title's close-up)
 // The look-around spring (B + direction): -1/0/1 per axis in screen space;
 // 0, 0 lets the camera spring back.
 void spring(int dx, int dy);

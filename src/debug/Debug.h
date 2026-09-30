@@ -27,9 +27,9 @@ void markRenderStart();
 void markRenderEnd();
 void print(const char *s);
 void waitInput();                   // block until input may have arrived (sim) / no-op
-// While true, game commands (the hook) are held until it turns false:
-// they must not touch the game while the CPU's search is running.
-extern bool (*holdGame)();
+// While true for a command, it (a game command, to the hook) is held until
+// it turns false: nothing may touch the game while the CPU searches.
+extern bool (*holdGame)(char cmd);
 // Profiling (CHCH_PROFILE builds): prof(i) charges the time since the
 // previous prof() to slot i; the T command reports and resets the averages.
 #if CHCH_PROFILE

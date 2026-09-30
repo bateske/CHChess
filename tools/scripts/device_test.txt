@@ -7,11 +7,6 @@ perf idle_normal
 tap SELECT
 wait 20
 perf reset
-free 4
-perf idle_close
-tap SELECT
-wait 20
-perf reset
 free 3
 perf idle_map
 tap SELECT
@@ -23,8 +18,12 @@ free 3
 perf piece_selected
 tap B
 # Into a middlegame, both sides by hand (two players: wait out each hand-over).
+# The first move is timed: the whip zoom, the landing, the hand-over.
 say M 12 28
-wait 100
+perf reset
+free 3
+perf whip_move
+wait 40
 say M 52 36
 wait 100
 say M 6 21

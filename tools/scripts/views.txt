@@ -1,51 +1,40 @@
-# The three views and the look-around spring, from a middlegame.
+# The two views, the cursor stepping through what can move, and the
+# look-around spring, from a middlegame.
 say G 0 0 1 42
 wait 20
 say X r1bq1rk1/pp2bppp/2n1pn2/3p4/2PP4/2N1PN2/PP1B1PPP/R2QKB1R w KQ - 0 8
 wait 30
-snap normal_e2
+snap normal_start
 tap LEFT
-tap LEFT
-tap LEFT
-tap LEFT
-wait 20
-snap normal_a2
+wait 10
+snap normal_left
 tap UP
+wait 10
+snap normal_up
 tap UP
-tap UP
-tap UP
-tap UP
-tap UP
-wait 20
-snap normal_a8
+wait 10
+snap normal_up2
 tap A
 wait 10
-snap normal_a8_sel
-tap B
-tap SELECT
-wait 20
-snap close_a8
-tap DOWN
-tap DOWN
-tap DOWN
+snap normal_sel
 tap RIGHT
-tap RIGHT
-tap RIGHT
-wait 20
-snap close_d5
+wait 10
+snap normal_sel_right
 hold B+RIGHT
 wait 30
-snap close_spring_right
+snap spring_right
 release
 wait 30
-snap close_sprung_back
+snap sprung_back
 tap SELECT
 wait 20
 snap map
-tap A
+tap RIGHT
 wait 10
-snap map_sel
+snap map_right
 tap B
+wait 10
+snap map_put_back
 tap SELECT
 wait 20
 snap back_to_normal

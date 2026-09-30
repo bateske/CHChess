@@ -64,6 +64,7 @@ bool cpuThinking();
 
 // Human moves.
 uint8_t movesFrom(uint8_t from, uint8_t *to, uint8_t *capture);   // destinations (<= 32)
+uint8_t movable(uint8_t *sq);        // the human's pieces that have a move (<= 16)
 bool needsPromotion(uint8_t from, uint8_t to);
 bool play(uint8_t from, uint8_t to, uint8_t promo = eng::QUEEN);  // false if illegal
 bool canUndo();

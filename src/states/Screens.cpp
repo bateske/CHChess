@@ -28,7 +28,9 @@ static Scr cur = Scr::Title, pending = Scr::Title;
 static uint16_t t;                   // frames on this screen
 static uint8_t fadeOut, fadeIn;
 static uint8_t sel;                  // menu cursor
+#if !CHCH_LEAN
 static Scr optBack = Scr::Title;
+#endif
 
 static Options opt;
 static Stats stats;
@@ -72,7 +74,8 @@ static void enter(Scr s) {
         match::Setup demo = {match::TWO_PLAYER, 0, 0, 1};
         match::start(demo);
         stage::update(false);
-        stage::setView(stage::CLOSE);
+        stage::setView(stage::NORMAL);
+        stage::setZoom(10);
         audio::sfx(Sfx::Title);
     }
     if (s == Scr::Setup) sel = 2;
@@ -150,7 +153,9 @@ static uint8_t titleItems(uint8_t *items) {
     if (hasGame) items[n++] = I_CONTINUE;
     items[n++] = I_ONE;
     items[n++] = I_TWO;
+#if !CHCH_LEAN
     items[n++] = I_OPTIONS;
+#endif
     return n;
 }
 
@@ -178,7 +183,9 @@ static void titleUpdate() {
                 if (save::loadGame()) { overlay = NONE; statsCounted = false; go(Scr::Play); }
                 else { hasGame = false; audio::sfx(Sfx::Deny); }
                 break;
+#if !CHCH_LEAN
             case I_OPTIONS: optBack = Scr::Title; go(Scr::Options); break;
+#endif
         }
     }
     // Drift over the board, close up: along White's army, round to Black's
@@ -260,11 +267,6 @@ static void setupRender(uint32_t frame) {
 // ---------------------------------------------------------------------------
 // Play
 // ---------------------------------------------------------------------------
-static bool ownPiece(uint8_t sq) {
-    uint8_t p = match::board[sq];
-    return p && ((p & eng::BLACK) != 0) == match::blackToMove();
-}
-
 static void tryTarget(uint8_t sq) {
     uint8_t from = stage::selected();
     if (match::needsPromotion(from, sq)) {
@@ -297,35 +299,69 @@ static void cycleView() {
     audio::sfx(Sfx::Whoosh);
 }
 
-static void playInput() {
-    uint8_t c = stage::cursor();
-    int du = 0, dv = 0;
-    if (!arduboy.pressed(B_BUTTON)) {
-        if (arduboy.repeat(UP_BUTTON)) dv = -1;
-        if (arduboy.repeat(DOWN_BUTTON)) dv = 1;
-        if (arduboy.repeat(LEFT_BUTTON)) du = -1;
-        if (arduboy.repeat(RIGHT_BUTTON)) du = 1;
+// The cursor only visits what can be played: your pieces that have a move,
+// or, once one is picked up, the squares it can go to.
+static uint8_t spots(uint8_t *list) {
+    uint8_t s = stage::selected(), cap[32];
+    return s != 0xFF ? match::movesFrom(s, list, cap) : match::movable(list);
+}
+
+// The spot nearest `from` in screen direction (ux, uy) - diagonals and all,
+// whatever the view - preferring ones straight ahead. With none that way it
+// wraps round to the farthest the other way, so pressing on steps through
+// every spot. (0, 0): simply the nearest.
+static uint8_t nearest(const uint8_t *list, uint8_t n, uint8_t from, int ux, int uy) {
+    int fx, fy;
+    iso::worldOf(from, fx, fy);
+    uint8_t best = 0xFF, back = 0xFF;
+    int32_t bestS = 0x7FFFFFFF, backS = 0x7FFFFFFF;
+    for (uint8_t i = 0; i < n; i++) {
+        if (list[i] == from) continue;
+        int x, y;
+        iso::worldOf(list[i], x, y);
+        int dx = x - fx, dy = y - fy;
+        int along = dx * ux + dy * uy, side = dx * uy - dy * ux;
+        if (side < 0) side = -side;
+        if (!ux && !uy) along = (dx < 0 ? -dx : dx) + (dy < 0 ? -dy : dy);
+        int32_t sc = along > 0 ? along + 2 * side : 4 * along + side;
+        if (along > 0 && sc < bestS) { bestS = sc; best = list[i]; }
+        if (along <= 0 && sc < backS) { backS = sc; back = list[i]; }
     }
-    if (du || dv) stage::moveCursor(du, dv);
-    if (arduboy.justReleased(B_BUTTON) && !bUsed && stage::selected() != 0xFF) {
+    return best != 0xFF ? best : back;
+}
+
+static void playInput() {
+    uint8_t list[32], n = spots(list), c = stage::cursor(), s = stage::selected();
+    if (!n) return;
+    // A new turn (or an undo) may leave the cursor on nothing playable.
+    bool on = false;
+    for (uint8_t i = 0; i < n; i++) on |= list[i] == c;
+    if (!on) stage::setCursor(c = nearest(list, n, c, 0, 0));
+    int ux = 0, uy = 0;
+    if (!arduboy.pressed(B_BUTTON)) {
+        if (arduboy.repeat(UP_BUTTON)) uy = -1;
+        if (arduboy.repeat(DOWN_BUTTON)) uy = 1;
+        if (arduboy.repeat(LEFT_BUTTON)) ux = -1;
+        if (arduboy.repeat(RIGHT_BUTTON)) ux = 1;
+    }
+    if (ux || uy) {
+        uint8_t t = nearest(list, n, c, ux, uy);
+        if (t != 0xFF) { stage::setCursor(t); audio::sfx(Sfx::Cursor); }
+        else audio::sfx(Sfx::Deny);
+    }
+    if (arduboy.justReleased(B_BUTTON) && !bUsed && s != 0xFF) {
         stage::deselect();
+        stage::setCursor(s);                 // back onto the piece
         audio::sfx(Sfx::Cursor);
     }
     if (arduboy.justPressed(A_BUTTON)) {
-        uint8_t s = stage::selected();
-        uint8_t to[32], cap[32];
-        if (s == c) { stage::deselect(); audio::sfx(Sfx::Cursor); }
-        else if (ownPiece(c)) {
-            uint8_t n = match::movesFrom(c, to, cap);
-            if (n) stage::select(c, to, cap, n);
-            else stage::deny(c);
-        } else if (s != 0xFF) {
-            uint8_t n = match::movesFrom(s, to, cap);
-            bool ok = false;
-            for (uint8_t i = 0; i < n; i++) if (to[i] == c) ok = true;
-            if (ok) tryTarget(c);
-            else audio::sfx(Sfx::Deny);
-        } else audio::sfx(Sfx::Deny);
+        c = stage::cursor();
+        if (s != 0xFF) tryTarget(c);
+        else {
+            uint8_t to[32], cap[32], k = match::movesFrom(c, to, cap);
+            stage::select(c, to, cap, k);
+            stage::setCursor(nearest(to, k, c, 0, 0));
+        }
     }
 }
 
@@ -480,8 +516,10 @@ static void playRender(uint32_t frame) {
 }
 
 // ---------------------------------------------------------------------------
-// Options
+// Options (device debug builds leave the screen out to fit the protocol:
+// their tests start games directly)
 // ---------------------------------------------------------------------------
+#if !CHCH_LEAN
 enum Opt : uint8_t { O_SOUND, O_FELT, O_HINTS, O_COORDS, O_SPEED, O_BACK, OPT_COUNT };
 static const char *const OPT_TEXT[OPT_COUNT] = {
     "SOUND|OFF|ON", "BOARD|GREEN|BLUE|RED|PURPLE", "HINTS|OFF|ON", "COORDS|OFF|ON", "PACE|SHOWY|QUICK",
@@ -536,12 +574,10 @@ static void optionsRender(uint32_t frame) {
         optField(OPT_TEXT[i], (uint8_t)(((uint8_t *)&opt)[i] + 1), value);
         text35x2(114 - text35x2Width(value), y, value, i == sel ? WHITE : FELT_LT);
     }
-#if !CHCH_LEAN
-    // Credits (device debug builds leave them out to fit the debug protocol).
     centred35(110, "ARDUCHESS ENGINE: PETER BROWN", SILVER);
     centred35(117, "FONT: PRESS PLAY ON TAPE", SILVER);
-#endif
 }
+#endif
 
 // ---------------------------------------------------------------------------
 // Debug protocol hooks (tools/chsim/chdrive.py 'say')
@@ -629,8 +665,12 @@ static bool debugHook(char cmd, const char *args) {
     return false;
 }
 // Game commands wait while the CPU searches or plays (a scripted move
-// arrives when it is the human's turn, as a press would).
-static bool searching() { return match::cpuThinking() || (cur == Scr::Play && match::active() && !match::humanToMove()); }
+// arrives when it is the human's turn, as a press would); the render
+// profile and the think report never touch the game, so they run at once.
+static bool searching(char cmd) {
+    if (cmd == 'Y' || cmd == 'W') return false;
+    return match::cpuThinking() || (cur == Scr::Play && match::active() && !match::humanToMove());
+}
 #endif
 
 // ---------------------------------------------------------------------------
@@ -664,7 +704,9 @@ void update(bool thinking) {
         case Scr::Title:   titleUpdate(); break;
         case Scr::Setup:   setupUpdate(); break;
         case Scr::Play:    playUpdate(false); break;
+#if !CHCH_LEAN
         case Scr::Options: optionsUpdate(); break;
+#endif
     }
     fx::update();
 }
@@ -674,7 +716,9 @@ void render(uint32_t frame) {
         case Scr::Title:   titleRender(frame); break;
         case Scr::Setup:   setupRender(frame); break;
         case Scr::Play:    playRender(frame); break;
+#if !CHCH_LEAN
         case Scr::Options: optionsRender(frame); break;
+#endif
     }
 }
 

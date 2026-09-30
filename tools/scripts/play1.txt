@@ -8,7 +8,6 @@ tap A
 wait 6
 snap selected_e2
 tap UP
-tap UP
 wait 4
 snap cursor_e4
 tap A
@@ -21,9 +20,11 @@ wait 4
 snap strategy
 tap SELECT
 wait 4
-tap B+RIGHT
-wait 8
-snap cycle
+hold B+RIGHT
+wait 20
+snap look_around
+release
+wait 20
 tap START
 wait 2
 snap pause

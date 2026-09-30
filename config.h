@@ -18,9 +18,9 @@
 #endif
 #endif
 
-// Device debug builds carry the ~1.3 KB protocol, so they leave out things
-// the tests never need (the credits card). The simulator (not flash-bound)
-// and release builds keep everything.
+// Device debug builds carry the ~2 KB protocol, so they leave out things the
+// tests never need (saving, the options screen and its credits). The
+// simulator (not flash-bound) and release builds keep everything.
 #if CHCH_DEBUG && !defined(CHSIM) && !defined(CHCH_FULL)
 #define CHCH_LEAN        1
 #else

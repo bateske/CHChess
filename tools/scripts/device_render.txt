@@ -1,5 +1,5 @@
 # On the board: what a full redraw costs, by section (RPROF: table board
-# overlays pieces hud fx, us), in each view.
+# overlays pieces hud fx, us), in each view and zoomed in on a move.
 say G 1 0 0 1
 wait 60
 say Y
@@ -8,6 +8,6 @@ wait 20
 say Y
 tap SELECT
 wait 20
+say M 12 28
+wait 8
 say Y
-tap SELECT
-wait 20

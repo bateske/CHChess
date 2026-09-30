@@ -1,4 +1,4 @@
-// The board on screen: the isometric view (two zoom steps) and the flat map
+// The board on screen: the isometric view (zoomable) and the flat map
 // (strategy view), with the table, the board's slab, square highlights and
 // where pieces stand.
 //
@@ -16,14 +16,17 @@ namespace iso {
 
 constexpr int CX = 64, CY = 69;             // screen point the camera looks at (below the HUD)
 
-// Current view: zoom 1 = 20x10 tiles, 2 = 40x20 (pieces drawn doubled);
-// map = the flat board seen from above.
-extern uint8_t zoom;
+// Current view: tileH is half a tile's height, 5 (20x10 tiles) up to 10
+// (40x20, pieces drawn doubled) - the camera zooms through the steps between.
+// flat = the board seen from above (the map).
+extern uint8_t tileH;
 extern bool flat;
-void setView(bool flat, uint8_t zoom);
-inline int hw() { return 10 * zoom; }       // half a tile's width
-inline int hh() { return 5 * zoom; }        // half a tile's height
-inline int slab() { return 3 * zoom; }      // board thickness
+void setView(bool flat);
+inline int hw() { return 2 * tileH; }       // half a tile's width
+inline int hh() { return tileH; }           // half a tile's height
+inline int slab() { return (3 * tileH + 2) / 5; }   // board thickness
+inline int zscale() { return tileH * 256 / 5; }     // art scale, Q8 (256 = 1:1)
+inline int zoomed(int px) { return (px * zscale()) >> 8; }
 
 // Map layout: squares MW x MH from (MX, MY).
 constexpr int MX = 10, MY = 26, MW = 14, MH = 11;

@@ -1,0 +1,37 @@
+# The play screen's controls: the cursor stepping through your movable
+# pieces and then a piece's squares, the whip zoom on a move, the move
+# announcement, and the map with its piece plate.
+say G 0 0 0 1
+wait 90
+snap start
+tap RIGHT
+wait 6
+snap right
+tap UP
+wait 6
+snap up
+tap LEFT
+wait 6
+snap left
+tap A
+wait 10
+snap selected
+tap UP
+wait 6
+snap target_up
+gif whip 70
+tap A
+gif move 90 1
+wait 30
+snap announced
+wait 200
+snap cpu_moved
+tap SELECT
+wait 30
+snap map
+tap RIGHT
+wait 6
+snap map_right
+tap A
+wait 6
+snap map_selected
