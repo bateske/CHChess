@@ -46,10 +46,9 @@ static bool statsCounted;
 static uint32_t thinkMs;            // the CPU's last search, wall time (debug W)
 #endif
 
-static const char *const OPPONENT[match::LEVELS] = {"BEGINNER", "CLUB PLAYER", "EXPERT", "MASTER", "GRANDMASTER"};
+static const char *const OPPONENT[match::LEVELS] = {"BEGINNER", "EXPERT", "GRANDMASTER"};
 static const char *const OPP_LINE[match::LEVELS] = {
-    "STILL LEARNING THE MOVES", "SOLID, BUT SLIPS UP", "PUNISHES MISTAKES", "PLAYS TO WIN, NOT DRAW",
-    "ITS BEST MOVE, EVERY TIME"};
+    "STILL LEARNING THE MOVES", "PUNISHES MISTAKES", "ITS BEST MOVE, EVERY TIME"};
 
 // ---------------------------------------------------------------------------
 // Flow

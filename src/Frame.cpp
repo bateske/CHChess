@@ -24,8 +24,9 @@ namespace frame {
 // at once, and a held one or an open menu keeps it going. The engine calls
 // back every 8 nodes (CH2K_POLL_NODES, ~5 ms), so that is prompt. Between
 // bursts, a frame every BOB_MS keeps the glove bobbing (a step of it each),
-// and a soft clock ticks and tocks every TICK_MS.
-static const uint16_t FIRST_MS = 300, SEARCH_MS = 2000, BURST_MS = 450, BOB_MS = 133, TICK_MS = 1000;
+// and a soft clock ticks and tocks every TICK_MS: slowly, so time seems to
+// slow down (and the search's hiccups hide between the beats).
+static const uint16_t FIRST_MS = 300, SEARCH_MS = 2000, BURST_MS = 450, BOB_MS = 133, TICK_MS = 2000;
 static uint32_t burstAt, bobAt, tickAt;
 static bool tock;
 // Lockstep (scripts, the simulator): one frame per two polls, i.e. per 16

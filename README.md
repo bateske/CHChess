@@ -80,15 +80,13 @@ pieces that can get you out of it. The camera leans towards
 the middle of the board, so the selection is always in view without empty
 carpet at the edges.
 
-Play one or two players. Against the CPU, choose your side and one of five
+Play one or two players. Against the CPU, choose your side and one of three
 opponents:
 
 | Opponent | |
 |---|---|
 | BEGINNER | still learning the moves: picks any move not much worse than the best |
-| CLUB PLAYER | solid, but slips up |
 | EXPERT | punishes mistakes |
-| MASTER | plays to win, not draw |
 | GRANDMASTER | its best move, every time |
 
 The weaker opponents choose at random among moves within a margin of the

@@ -1,7 +1,7 @@
-# On the board: CPU turns against THE HOUSE (out of its book by its third
+# On the board: CPU turns against GRANDMASTER (out of its book by its third
 # move) with frames drawn while it searches. W prints the search's wall time
 # and nodes, perf the frames drawn meanwhile. Nothing is sent mid-search.
-say G 0 0 4 5
+say G 0 0 2 5
 wait 60
 say M 12 28
 free 20

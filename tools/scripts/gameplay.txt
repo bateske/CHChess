@@ -26,7 +26,7 @@ tap RIGHT
 wait 30
 tap RIGHT
 wait 30
-tap RIGHT
+tap LEFT
 wait 30
 tap DOWN
 wait 20

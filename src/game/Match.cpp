@@ -7,12 +7,10 @@ namespace match {
 // Node budget, how far below the best a move may score and still be picked
 // (centipawns), contempt (16 cp units). Measured on the board: ~1,700
 // nodes/s, with bursts of frames every 2 s, so these think for about 0.3,
-// 1, 2, 4 and 9 seconds.
+// 2 and 9 seconds.
 const eng::Level LEVEL[LEVELS] = {
     {400, 150, 0},       // BEGINNER
-    {1200, 60, 0},       // CLUB PLAYER
     {3000, 25, 0},       // EXPERT
-    {6000, 10, 2},       // MASTER: plays for the win
     {12000, 0, 0},       // GRANDMASTER
 };
 

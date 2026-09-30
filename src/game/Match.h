@@ -40,7 +40,7 @@ struct Setup {
     uint32_t seed;      // the CPU's random stream
 };
 
-constexpr uint8_t LEVELS = 5;
+constexpr uint8_t LEVELS = 3;
 extern const eng::Level LEVEL[LEVELS];
 
 // State the stage and the screens read.

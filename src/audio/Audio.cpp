@@ -34,10 +34,14 @@ static const Step DENY[]    = { S(900, 650, 70) };
 // A wooden piece set down: a knock and a higher tick.
 static const Step LAND[]    = { S(2400, 1100, 14), REST(8), S(3300, 0, 16) };
 static const Step HOP[]     = { S(1500, 3300, 80) };
-// A smash: tones alternating high and low read as noise on a piezo.
+// A smash - tones alternating high and low read as noise on a piezo, the
+// lows lengthening as it lands - then the piece spinning away: falling
+// swoops, about as long as it takes to fly off the screen.
 static const Step CAPTURE[] = {
-    S(3400, 0, 7), S(1100, 0, 7), S(3000, 0, 7), S(900, 0, 7), S(2700, 0, 7), S(750, 0, 8),
-    S(2300, 450, 110) };
+    S(3800, 0, 6), S(700, 0, 8), S(3200, 0, 6), S(600, 0, 8), S(2800, 0, 6), S(520, 0, 10),
+    S(2400, 0, 6), S(480, 0, 12),
+    S(2600, 2200, 70), S(2400, 2000, 70), S(2200, 1800, 70), S(2000, 1600, 70), S(1800, 1400, 70),
+    S(1600, 1200, 80), S(1400, 900, 110) };
 static const Step COIN[]    = { S(2800, 0, 10), S(3700, 0, 28) };
 static const Step CHECK[]   = { S(2637, 0, 70), S(1976, 0, 70), S(2637, 0, 70), S(1976, 0, 120) };
 static const Step CASTLE[]  = { S(2400, 1100, 14), REST(40), S(1400, 3200, 70), REST(30), S(2400, 1100, 14), REST(8), S(3300, 0, 16) };
