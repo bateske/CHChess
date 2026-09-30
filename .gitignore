@@ -1,0 +1,18 @@
+# Build output
+build/
+tools/chsim/build/
+tools/tests/build/
+out/
+
+# Press Play On Tape's original, cloned by tools/assets.py
+tools/.cache/
+
+# Python
+__pycache__/
+*.pyc
+
+# Local working files (art mockups, editor and OS clutter)
+docs/mockups/
+.vscode/
+.DS_Store
+Thumbs.db

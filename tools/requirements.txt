@@ -1,0 +1,5 @@
+# Python packages for the tools in this folder (not needed to build or play).
+pillow      # screenshots, GIFs, asset pipeline
+pyserial    # talking to the board (device.py, chdrive.py --device)
+# A C++ compiler is also needed for the simulator, tests and audio previews:
+# zig, clang++ or g++ on the PATH, or `pip install ziglang`.

@@ -1,0 +1,33 @@
+# The big moments, from set positions (two players; squares a1=0 .. h8=63).
+# Capture: e4xd5
+say X rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq -
+wait 12
+say M 28 35
+gif capture 50 2
+# Check: ...Bb4+
+say X rnbqkbnr/pppp1ppp/8/4p3/3PP3/8/PPP2PPP/RNBQKBNR b KQkq -
+wait 12
+say M 61 25
+gif check 60 2
+# Castling: O-O
+say X r3k2r/pppqbppp/2np1n2/4p3/2B1P3/2NP1N2/PPP2PPP/R2QK2R w KQkq -
+wait 12
+say M 4 6
+gif castle 40 2
+# En passant: exf6 e.p.
+say X rnbqkbnr/ppp1p1pp/8/3pPp2/8/8/PPPP1PPP/RNBQKBNR w KQkq f6
+wait 12
+say M 36 45
+gif enpassant 40 2
+# Promotion: a7-a8=Q
+say X 8/P7/8/8/8/8/k6K/8 w - -
+wait 12
+say M 48 56 5
+gif promote 50 2
+# Mate: Qxf7#
+say X r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq -
+wait 12
+say M 39 53
+gif mate 120 3
+wait 60
+snap result

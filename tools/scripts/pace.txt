@@ -1,0 +1,17 @@
+# Frame pacing on the device (needs only the debug build): each PERF after a
+# 5 s free run should report ~300 frames and late=0.
+# 1. Title screen, idle (card fan, rainbow and pulse palette effects).
+say J T
+wait 60
+perf
+free 5
+perf
+# 2. A new game: bet, deal and play out in real time.
+say J P
+wait 100
+say R 7
+tap A
+tap A
+perf
+free 5
+perf

@@ -1,0 +1,8 @@
+# Two players: the camera hands the board over after each move.
+say G 1 0 0 7
+wait 20
+say M 12 28
+gif handover_to_black 60 1
+say M 52 36
+gif handover_to_white 60 2
+snap white_again

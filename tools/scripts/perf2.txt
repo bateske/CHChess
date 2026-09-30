@@ -1,0 +1,21 @@
+# Render cost, one frame per logic tick (as on the board), with section laps.
+cal
+say G 0 0 1 42
+wait 30
+perf reset
+say Y
+step 60
+perf idle_board
+say Y
+tap A
+step 60
+perf piece_selected
+say Y
+tap UP
+step 30
+perf cursor_moves
+say Y
+tap SELECT
+step 30
+perf strategy
+say Y

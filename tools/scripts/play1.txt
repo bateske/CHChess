@@ -1,0 +1,30 @@
+# First playtest: title, then a game vs REGULAR; e2-e4, the CPU answers.
+wait 40
+snap title
+say G 0 0 1 42
+wait 30
+snap hover_e2
+tap A
+wait 6
+snap selected_e2
+tap UP
+tap UP
+wait 4
+snap cursor_e4
+tap A
+gif human_move 30 2
+gif cpu_turn 70 2
+wait 60
+snap after_cpu
+tap SELECT
+wait 4
+snap strategy
+tap SELECT
+wait 4
+tap B+RIGHT
+wait 8
+snap cycle
+tap START
+wait 2
+snap pause
+tap START

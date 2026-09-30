@@ -1,0 +1,29 @@
+# Board colour look-dev: a middlegame from White's side, both armies in view.
+# T dark light table dot (palette indices: 0 INK 1 WHITE 2 FELT_DK 3 FELT 4 FELT_LT
+# 5 SILVER 6 RED 7 WINE 8 GOLD 9 WOOD 10 BLUE 11 NAVY 12 SKIN 13 CYAN)
+wait 2
+say X r1bq1rk1/pp2bppp/2n1pn2/3p4/2PP4/2N1PN2/PP1B1PPP/R2QKB1R w KQ - 0 8
+say C 300 118
+wait 1
+snap a_wood_skin_felt
+say T 3 12 11 2
+wait 1
+snap b_felt_skin_navy
+say T 7 12 3 2
+wait 1
+snap c_wine_skin_felt
+say T 9 5 3 2
+wait 1
+snap d_wood_silver_felt
+say T 2 4 11 2
+wait 1
+snap e_feltdk_feltlt_navy
+say T 11 5 3 2
+wait 1
+snap f_navy_silver_felt
+say T 9 12 11 7
+wait 1
+snap g_wood_skin_navy
+say T 3 5 11 2
+wait 1
+snap h_felt_silver_navy
