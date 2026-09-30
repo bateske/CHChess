@@ -1,0 +1,19 @@
+CHChess
+Copyright 2026 bateske
+
+Chess engine: src/engine/ch2k.hpp is the ch2k engine from ArduChess by
+Peter Brown (tiberiusbrown), https://github.com/tiberiusbrown/arduchess
+(commit 067feba, 2026-03), licensed under the Mozilla Public License 2.0
+(LICENSE.MPL-2.0). It is modified for this game; the changes are listed at
+the top of the file, which remains under the MPL-2.0.
+
+From CHBlackjack (https://github.com/bateske/CHBlackjack, Apache-2.0): the
+input and frame pacing (src/CHGame.*), palette, drawing, outlined lettering,
+effects, sound sequencer, flash saving, debug protocol and the PC simulator
+and tools, adapted here. CHBlackjack is a derivative of "Blackjack" for the
+Arduboy by Press Play On Tape (Apache-2.0); the 3x5 pixel font in
+src/gfx/Draw.cpp is Press Play On Tape's.
+
+Everything else - the isometric board, camera and views, the piece art
+(rendered by tools/pieces.py), the game flow, the CPU's personalities and
+the presentation - is new, under the Apache License 2.0 (LICENSE).

@@ -2,9 +2,9 @@
 // does: TIM1 counting at 1 MHz in PWM mode 1 on channel 2, with the auto-
 // reload and compare preload registers, update events and counter resets.
 //
-//   harness OUT.wav MODE song|sfx INDEX MS [LOG.txt]
+//   harness OUT.wav INDEX MS [LOG.txt]
 //
-// MODE is Audio's (0 off, 1 arpeggio, 2 lead). Writes a 48 kHz WAV of the pin
+// INDEX is an Sfx (src/audio/Audio.h). Writes a 48 kHz WAV of the pin
 // and, optionally, one line per millisecond: "ms hz" (0 = silent). Prints the
 // number of times a sounding tone was cut off mid-cycle and restarted (each
 // is an audible click), and an FNV hash of the pin's level stream.
@@ -63,17 +63,14 @@ static void put32(FILE *f, uint32_t v) { fwrite(&v, 4, 1, f); }
 static void put16(FILE *f, uint16_t v) { fwrite(&v, 2, 1, f); }
 
 int main(int argc, char **argv) {
-    if (argc < 6) { fprintf(stderr, "usage: harness OUT.wav MODE song|sfx INDEX MS [LOG]\n"); return 2; }
+    if (argc < 4) { fprintf(stderr, "usage: harness OUT.wav INDEX MS [LOG]\n"); return 2; }
     const char *out = argv[1];
-    uint8_t mode = (uint8_t)atoi(argv[2]);
-    bool song = !strcmp(argv[3], "song");
-    int index = atoi(argv[4]);
-    uint32_t ms = (uint32_t)atoi(argv[5]);
-    FILE *log = argc > 6 ? fopen(argv[6], "w") : nullptr;
+    int index = atoi(argv[2]);
+    uint32_t ms = (uint32_t)atoi(argv[3]);
+    FILE *log = argc > 4 ? fopen(argv[4], "w") : nullptr;
 
-    audio::begin(mode);
-    if (song) audio::music((Song)index, true);
-    else audio::sfx((Sfx)index);
+    audio::begin(true);
+    audio::sfx((Sfx)index);
 
     std::vector<int16_t> pcm;
     pcm.reserve(ms * 48 + 16);
