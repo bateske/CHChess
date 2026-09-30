@@ -1,0 +1,22 @@
+# On the board: the worst frame of each kind of moment (perf max).
+say G 1 0 0 1
+perf reset
+free 2
+perf start_banner
+free 2
+perf reset
+free 2
+perf idle
+say M 12 28
+perf reset
+free 3
+perf handover
+free 3
+say M 51 35
+perf reset
+free 3
+perf handover2
+say M 28 35
+perf reset
+free 3
+perf capture

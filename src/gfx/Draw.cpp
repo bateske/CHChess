@@ -45,46 +45,6 @@ void roundRect(int x, int y, int w, int h, uint8_t r, uint8_t c) {
     gfx_vline(x + w - 1, y + r, h - 2 * r, c);
 }
 
-RAMFUNC(blit4) void blit4(const uint8_t *spr, int x, int y, uint8_t w, uint8_t h, int8_t trans, const uint8_t *remap) {
-    if (!remap) { gfx_blit(spr, x, y, w, h, trans); return; }
-    uint8_t stride = (uint8_t)((w + 1) >> 1);
-    for (int j = 0; j < h; j++) {
-        int yy = y + j;
-        if ((unsigned)yy >= GFX_H) continue;
-        const uint8_t *row = spr + j * stride;
-        uint8_t *d = gfx_fb + yy * GFX_FB_STRIDE;
-        for (int i = 0; i < w; i++) {
-            uint8_t b = row[i >> 1];
-            uint8_t v = (i & 1) ? (uint8_t)(b >> 4) : (uint8_t)(b & 0x0F);
-            int xx = x + i;
-            if (v != (uint8_t)trans && (unsigned)xx < GFX_W) plot(d + (xx >> 1), xx, remap[v]);
-        }
-    }
-}
-
-// Mostly short spans (the dealer is ~330 of them): write those directly and
-// hand only the long ones to gfx_hline.
-RAMFUNC(span4) void span4(const uint8_t *d, int x, int y, int8_t trans, const uint8_t *remap) {
-    uint8_t h = d[1];
-    d += 2;
-    for (int j = 0; j < h; j++, y++) {
-        uint8_t n = *d++;
-        int px = x;
-        uint8_t *row = gfx_fb + y * GFX_FB_STRIDE;
-        bool rowOk = (unsigned)y < GFX_H;
-        while (n--) {
-            uint8_t b = *d++;
-            uint8_t len = (uint8_t)((b >> 4) + 1), c = (uint8_t)(b & 15);
-            if (c != (uint8_t)trans && rowOk) {
-                if (remap) c = remap[c];
-                if (len > 4 || px < 0 || px + len > GFX_W) gfx_hline(px, y, len, c);
-                else for (int k = 0; k < len; k++) plot(row + ((px + k) >> 1), px + k, c);
-            }
-            px += len;
-        }
-    }
-}
-
 // A run of one colour within a row: odd nibble, whole bytes, odd nibble.
 static inline __attribute__((always_inline)) void fillRun(uint8_t *row, int a, int len, uint8_t c) {
     if (a < 0) { len += a; a = 0; }
@@ -109,21 +69,29 @@ RAMFUNC(sprite4) void sprite4(const uint8_t *d, int x, int y, const uint8_t *rem
         for (int rep = 0; rep < s; rep++, y++) {
             if ((unsigned)y >= GFX_H) continue;
             uint8_t *row = gfx_fb + y * GFX_FB_STRIDE;
-            int px = 0;
-            for (uint8_t i = 0; i < n; i++) {
-                uint8_t b = runs[i];
-                int len = (b >> 4) + 1;
+            // Walk the runs with a running x; mirrored, backwards from the
+            // row's right end (trailing transparency is implicit).
+            int q = x, step = 1;
+            const uint8_t *r = runs;
+            if (mirror) {
+                int used = 0;
+                for (uint8_t i = 0; i < n; i++) used += (runs[i] >> 4) + 1;
+                q += (w - used) * s;
+                r += n - 1; step = -1;
+            }
+            for (uint8_t i = 0; i < n; i++, r += step) {
+                uint8_t b = *r;
+                int len = ((b >> 4) + 1) * s;
                 uint8_t c = b & 15;
                 if (c != 15) {
                     c = remap[c];
-                    int a = mirror ? x + (w - px - len) * s : x + px * s;
-                    if (!ghost) fillRun(row, a, len * s, c);
+                    if (!ghost) fillRun(row, q, len, c);
                     else {
-                        for (int k = a + ((a + y) & 1); k < a + len * s; k += 2)
+                        for (int k = q + ((q + y) & 1); k < q + len; k += 2)
                             if ((unsigned)k < GFX_W) plot(row + (k >> 1), k, c);
                     }
                 }
-                px += len;
+                q += len;
             }
         }
     }

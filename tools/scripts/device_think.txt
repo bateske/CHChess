@@ -1,0 +1,21 @@
+# On the board: CPU turns against THE HOUSE (out of its book by its third
+# move) with frames drawn while it searches. W prints the search's wall time
+# and nodes, perf the frames drawn meanwhile. Nothing is sent mid-search.
+say G 0 0 4 5
+wait 60
+say M 12 28
+free 20
+say M 6 21
+free 20
+say M 1 18
+perf reset
+free 25
+say W
+perf cpu_turn
+snap after_cpu
+say M 11 19
+perf reset
+free 25
+say W
+perf cpu_turn2
+snap after_cpu2

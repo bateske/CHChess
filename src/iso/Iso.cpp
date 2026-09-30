@@ -49,12 +49,67 @@ void screenOf(uint8_t sq, int &x, int &y) {
 // ---------------------------------------------------------------------------
 static inline int halfWidth(int k, int th) { return k < th / 2 ? 2 * k + 1 : 2 * (th - 1 - k) + 1; }
 
-RAMFUNC(isodiamond) static void diamond(int cx, int top, int th, uint8_t c) {
-    int k0 = top < 0 ? -top : 0;
-    int k1 = GFX_H - top; if (k1 > th) k1 = th;
-    for (int k = k0; k < k1; k++) {
-        int w = halfWidth(k, th);
-        gfx_hline(cx - w, top + k, 2 * w, c);
+// Pixels [a, b) of a pattern row into screen row y: ragged nibble ends,
+// word copies between (both rows are word aligned).
+RAMFUNC(isocopy) static void copyRow(int y, const uint8_t *src, int a, int b) {
+    if (a < 0) a = 0;
+    if (b > GFX_W) b = GFX_W;
+    if ((unsigned)y >= GFX_H || a >= b) return;
+    uint8_t *dst = gfx_fb + y * GFX_FB_STRIDE;
+    if (a & 1) { dst[a >> 1] = (uint8_t)((dst[a >> 1] & 0x0F) | (src[a >> 1] & 0xF0)); a++; }
+    if (b & 1) { b--; dst[b >> 1] = (uint8_t)((dst[b >> 1] & 0xF0) | (src[b >> 1] & 0x0F)); }
+    int i = a >> 1, e = b >> 1;
+    while (i < e && (i & 3)) { dst[i] = src[i]; i++; }
+    for (; i + 4 <= e; i += 4) *(uint32_t *)(dst + i) = *(const uint32_t *)(src + i);
+    for (; i < e; i++) dst[i] = src[i];
+}
+
+// A span of colour c in a pattern row, clipped to the screen.
+RAMFUNC(isopatspan) static void patSpan(uint8_t *row, int a, int b, uint8_t c) {
+    if (a < 0) a = 0;
+    if (b > GFX_W) b = GFX_W;
+    for (; a < b; a++) {
+        uint8_t &p = row[a >> 1];
+        p = (a & 1) ? (uint8_t)((p & 0x0F) | (c << 4)) : (uint8_t)((p & 0xF0) | c);
+    }
+}
+
+// The iso squares. The board is one big diamond (top corner x0, y0), and
+// each of its rows is a periodic pattern: a light span centred every tile
+// width, dark between, as wide as the tile row it cuts. The pattern only
+// depends on the row within a tile, so each of the th patterns is built
+// once and copied into the eight board rows it appears in - a few word
+// copies a row instead of a span per square.
+RAMFUNC(isosquares) static void isoSquares(int x0, int y0, int hw, int th, uint8_t light, uint8_t dark) {
+    uint32_t pat[GFX_FB_STRIDE / 4];
+    uint8_t *pb = (uint8_t *)pat;
+    int rows = 8 * th;
+    for (int r = 0; r < th; r++) {
+        bool built = false;
+        for (int ry = r; ry < rows; ry += th) {
+            int y = y0 + ry;
+            if ((unsigned)y >= GFX_H) continue;
+            if (!built) {
+                built = true;
+                for (int i = 0; i < GFX_FB_STRIDE / 4; i++) pat[i] = dark * 0x11111111u;
+                int wl = halfWidth(r, th), c = x0;
+                while (c - wl > 0) c -= 2 * hw;
+                for (; c - wl < GFX_W; c += 2 * hw) patSpan(pb, c - wl, c + wl, light);
+            }
+            int w = halfWidth(ry, rows);
+            copyRow(y, pb, x0 - w, x0 + w);
+        }
+    }
+}
+
+// The map's squares: a pattern row per rank parity, copied into its rows.
+RAMFUNC(mapsquares) static void mapSquares(uint8_t light, uint8_t dark) {
+    uint32_t pat[GFX_FB_STRIDE / 4];
+    uint8_t *pb = (uint8_t *)pat;
+    for (int v = 0; v < 8; v++) {
+        for (int u = 0; u < 8; u++)
+            patSpan(pb, MX + u * MW, MX + (u + 1) * MW, (u + v) & 1 ? dark : light);
+        for (int k = 0; k < MH; k++) copyRow(MY + v * MH + k, pb, MX, MX + 8 * MW);
     }
 }
 
@@ -82,14 +137,13 @@ RAMFUNC(isotint) static void tintSpan(int x0, int x1, int y, uint8_t c) {
 void tileTint(uint8_t sq, uint8_t inset, uint8_t c) {
     int cx, top;
     if (!tileOnScreen(sq, cx, top)) return;
-    if (flat) {
-        for (int y = top + inset; y < top + MH - inset; y++) tintSpan(cx + inset, cx + MW - inset, y, c);
-        return;
-    }
-    int th = 2 * hh();
-    for (int k = inset; k < th - inset; k++) {
-        int w = halfWidth(k, th) - 2 * inset;
-        tintSpan(cx - w, cx + w, top + k, c);
+    int rows = flat ? MH : 2 * hh();
+    for (int k = inset; k < rows - inset; k++) {
+        if (flat) tintSpan(cx + inset, cx + MW - inset, top + k, c);
+        else {
+            int w = halfWidth(k, rows) - 2 * inset;
+            tintSpan(cx - w, cx + w, top + k, c);
+        }
     }
 }
 
@@ -97,13 +151,16 @@ void tileBorder(uint8_t sq, uint8_t inset, uint8_t c, uint8_t c2, uint8_t phase)
     int cx, top;
     if (!tileOnScreen(sq, cx, top)) return;
     if (flat) {
-        // Clockwise round the rectangle, dashes of 3.
-        int x0 = cx + inset, y0 = top + inset, w = MW - 2 * inset, h = MH - 2 * inset;
-        int p = 0;
-        for (int i = 0; i < w; i++, p++) nib(x0 + i, y0, ((p + phase) / 3) & 1 ? c2 : c);
-        for (int i = 1; i < h; i++, p++) nib(x0 + w - 1, y0 + i, ((p + phase) / 3) & 1 ? c2 : c);
-        for (int i = w - 2; i >= 0; i--, p++) nib(x0 + i, y0 + h - 1, ((p + phase) / 3) & 1 ? c2 : c);
-        for (int i = h - 2; i > 0; i--, p++) nib(x0, y0 + i, ((p + phase) / 3) & 1 ? c2 : c);
+        // Clockwise round the rectangle from its top-left corner, dashes of 3.
+        int x = cx + inset, y = top + inset, p = phase;
+        for (int side = 0; side < 4; side++) {
+            int n = (side & 1) ? MH - 2 * inset - 1 : MW - 2 * inset - 1;
+            for (int i = 0; i < n; i++, p++) {
+                nib(x, y, (p / 3) & 1 ? c2 : c);
+                if (side & 1) y += side == 1 ? 1 : -1;
+                else          x += side == 0 ? 1 : -1;
+            }
+        }
         return;
     }
     int th = 2 * hh();
@@ -179,18 +236,14 @@ static void rightFace(int xb, int yb, int depth, int shift, uint8_t c, uint8_t t
 
 static void label(int x, int y, char ch) {
     char s[2] = {ch, 0};
-    if (x > -4 && x < GFX_W && y > -6 && y < GFX_H) text35(x, y, s, GOLD);
+    text35(x, y, s, GOLD);                      // clips per pixel
 }
 
 void drawBoard() {
     if (flat) {
         gfx_rect(MX - 2, MY - 2, 8 * MW + 4, 8 * MH + 4, GOLD);
         gfx_rect(MX - 1, MY - 1, 8 * MW + 2, 8 * MH + 2, INK);
-        for (uint8_t sq = 0; sq < 64; sq++) {
-            int x, y;
-            tileOnScreen(sq, x, y);
-            gfx_fillRect(x, y, MW, MH, ((sq >> 3) + sq) & 1 ? lightSq : darkSq);
-        }
+        mapSquares(lightSq, darkSq);
         for (int i = 0; coords && i < 8; i++) {
             label(MX + i * MW + MW / 2 - 1, MY + 8 * MH + 3, (char)('A' + (cam.flip ? 7 - i : i)));
             label(MX - 8, MY + i * MH + MH / 2 - 2, (char)('8' - (cam.flip ? 7 - i : i)));
@@ -208,13 +261,7 @@ void drawBoard() {
     leftFace(xl, yl, s, 0, WINE, GOLD);
     rightFace(xb, yb, s, 0, INK, GOLD);
 
-    // Squares (only those on screen).
-    int th = 2 * hh();
-    for (uint8_t sq = 0; sq < 64; sq++) {
-        int cx, top;
-        if (!tileOnScreen(sq, cx, top)) continue;
-        diamond(cx, top, th, ((sq >> 3) + sq) & 1 ? lightSq : darkSq);
-    }
+    isoSquares(xb, yl - 8 * hh(), hw(), 2 * hh(), lightSq, darkSq);
 
     // Coordinates on the carpet below the near edges: files along the left
     // one, ranks along the right (reversed from Black's side).

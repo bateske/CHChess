@@ -12,13 +12,10 @@
 void fillRound(int x, int y, int w, int h, uint8_t r, uint8_t c);   // r <= 4
 void roundRect(int x, int y, int w, int h, uint8_t r, uint8_t c);
 
-// 4 bpp sprite (CHGfx packing) with an optional colour remap table.
-void blit4(const uint8_t *spr, int x, int y, uint8_t w, uint8_t h, int8_t trans, const uint8_t *remap = nullptr);
-// Row-span art: w, h, then per row a count and (len-1)<<4|colour bytes;
-// colour `trans` is skipped. Every span is one gfx_hline.
-void span4(const uint8_t *data, int x, int y, int8_t trans, const uint8_t *remap = nullptr);
-// span4 art (colour 15 = skip) with a remap, mirrored left-right and/or
-// ghosted (every other pixel, checkerboard) - pieces in front of the cursor.
+// span4 art (tools/assets.py pack_span4): w, h, then per row a count and
+// (len-1)<<4|colour bytes, colour 15 = skip. Drawn through a remap,
+// mirrored left-right, doubled and/or ghosted (every other pixel,
+// checkerboard) - pieces in front of the cursor.
 enum : uint8_t { SPR_MIRROR = 1, SPR_GHOST = 2, SPR_2X = 4 };
 void sprite4(const uint8_t *data, int x, int y, const uint8_t *remap, uint8_t flags);
 // span4 art turned by `angle` (256 = one turn) and scaled (256 = 1:1) about

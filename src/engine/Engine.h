@@ -62,6 +62,7 @@ int materialBalance();                          // white minus black, pawns = 1
 // be picked, and draw contempt (1 = 16 cp).
 struct Level { uint32_t nodes; int16_t margin; uint8_t contempt; };
 Move think(const Level &lv);                    // blocking; calls CH2K_POLL
+Move benchThink(const Level &lv);               // no book, no poll hook (speed tests)
 void abort();                                   // from the poll hook
 bool aborted();
 int16_t lastScore();                            // side to move's view, cp
@@ -75,7 +76,7 @@ void loadFen(const char *fen);                  // simulator / tests only
 void seed(uint32_t s);                          // the AI's own random stream
 uint8_t rand8();
 
-// Called every 256 nodes during think() (null = nothing).
+// Called every 8 nodes during think() (null = nothing).
 extern void (*pollHook)();
 bool thinking();
 

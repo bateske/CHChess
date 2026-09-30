@@ -14,60 +14,63 @@ Mask maskBegin(int w, int h) {
     return m;
 }
 
-void Mask::set(int x, int y) {
-    x += 1; y += 1;                                   // margin
-    if ((unsigned)x >= (unsigned)(w + 2) || (unsigned)y >= (unsigned)(h + 2)) return;
-    bits[y * stride + (x >> 3)] |= (uint8_t)(0x80 >> (x & 7));
-}
-
-static void plot(Mask &m, int x, int y, uint8_t scale) {
-    for (int j = 0; j < scale; j++)
-        for (int i = 0; i < scale; i++) m.set(x + i, y + j);
-}
-
 int text35WidthScaled(const char *s, uint8_t scale) { return text35Width(s) * scale; }
 
+// Each font row, scaled, is one bit pattern (3 * scale bits) ORed into
+// `scale` mask rows: a few byte ORs a row rather than a call per pixel.
 void maskText35(Mask &m, int x, int y, const char *s, uint8_t scale, const int8_t *dy) {
-    for (int k = 0; s[k]; k++) {
-        if (s[k] == '~') { x += 2 * scale; continue; }
+    uint32_t one = (1u << scale) - 1;
+    for (int k = 0; s[k]; k++, x += 4 * scale) {
+        if (s[k] == '~') { x -= 2 * scale; continue; }
         int g = glyph35(s[k]);
-        int oy = y + (dy ? dy[k] : 0);
-        if (g >= 0)
-            for (int col = 0; col < 3; col++)
-                for (int row = 0; row < 6; row++)
-                    if (FONT35[g][col] & (1u << row)) plot(m, x + col * scale, oy + row * scale, scale);
-        x += 4 * scale;
+        if (g < 0) continue;
+        int top = y + (dy ? dy[k] : 0) + 1, bx = x + 1;     // + the margin
+        if (bx < 0) continue;
+        for (int row = 0; row < 6; row++) {
+            uint32_t pat = 0;
+            for (int col = 0; col < 3; col++) pat = (pat << scale) | (((FONT35[g][col] >> row) & 1) ? one : 0);
+            if (!pat) continue;
+            pat <<= 32 - 3 * scale - (bx & 7);
+            for (int j = 0; j < scale; j++) {
+                int r = top + row * scale + j;
+                if ((unsigned)r >= (unsigned)(m.h + 2)) continue;
+                uint8_t *p = m.bits + r * m.stride;
+                for (int b = 0; b < 4 && (bx >> 3) + b < m.stride; b++) p[(bx >> 3) + b] |= (uint8_t)(pat >> (24 - 8 * b));
+            }
+        }
     }
 }
 
-void maskBlit1(Mask &m, const uint8_t *bits, int x, int y, uint8_t w, uint8_t h, uint8_t scale) {
-    uint8_t stride = (uint8_t)((w + 7) >> 3);
-    for (int j = 0; j < h; j++)
-        for (int i = 0; i < w; i++)
-            if (bits[j * stride + (i >> 3)] & (0x80 >> (i & 7))) plot(m, x + i * scale, y + j * scale, scale);
-}
-
-// Paint the set runs of one mask row (stride bytes, MSB-first) at screen
-// row y, where bit 0 of the row is screen column x. From SRAM, skipping
-// empty and full bytes whole: this loop is most of a banner's cost.
+// Paint the set bits of one mask row (stride bytes, MSB-first) at screen
+// row y, bit 0 at screen column x. A mask byte is eight pixels, four
+// framebuffer bytes, so the bits go two at a time (at an odd x shifted one
+// along first). From SRAM: this loop is most of a banner's cost.
 __attribute__((section(".srodata.ramfunc.maskruns"), noinline))
 static void runs(const uint8_t *row, uint8_t stride, int x, int y, uint8_t c) {
     if ((unsigned)y >= GFX_H) return;
-    int n = stride * 8, i = 0, start = -1;
-    while (i < n) {
-        uint8_t b = row[i >> 3];
-        if ((i & 7) == 0) {
-            if (b == 0x00) { if (start >= 0) { gfx_hline(x + start, y, i - start, c); start = -1; } i += 8; continue; }
-            if (b == 0xFF) { if (start < 0) start = i; i += 8; continue; }
+    uint8_t *fb = gfx_fb + y * GFX_FB_STRIDE;
+    uint8_t cc = (uint8_t)(c | (c << 4));
+    int odd = x & 1, px = x - odd;
+    uint8_t prev = 0;
+    for (int i = 0; i <= stride; i++, px += 8) {
+        uint8_t cur = i < stride ? row[i] : 0;
+        uint8_t b = odd ? (uint8_t)((prev << 7) | (cur >> 1)) : cur;
+        prev = cur;
+        for (int xx = px; b; xx += 2, b = (uint8_t)(b << 2)) {
+            if ((unsigned)xx >= GFX_W) continue;
+            uint8_t &q = fb[xx >> 1];
+            switch (b & 0xC0) {
+                case 0xC0: q = cc; break;
+                case 0x80: q = (uint8_t)((q & 0xF0) | c); break;          // left pixel
+                case 0x40: q = (uint8_t)((q & 0x0F) | (c << 4)); break;   // right pixel
+            }
         }
-        if (b & (0x80 >> (i & 7))) { if (start < 0) start = i; }
-        else if (start >= 0) { gfx_hline(x + start, y, i - start, c); start = -1; }
-        i++;
     }
-    if (start >= 0) gfx_hline(x + start, y, n - start, c);
 }
 
-// Grow row r by one pixel in all 8 directions into out.
+// Grow row r by one pixel in all 8 directions into out. From SRAM too: it
+// runs for every row twice (outline and shadow).
+__attribute__((section(".srodata.ramfunc.maskdilate"), noinline))
 static void dilateRow(const Mask &m, int r, uint8_t *out) {
     int rows = m.h + 2;
     for (int b = 0; b < m.stride; b++) {

@@ -17,6 +17,7 @@ bool overShown();                    // the end of the game has been shown
 // framebuffer still holds it). ui: a signature of what the caller draws on top.
 bool render(uint32_t frame, uint32_t ui);
 void invalidate();                   // redraw next frame
+void profile(uint32_t *us);          // debug builds: us per section (table, board, overlays, pieces, HUD)
 
 // The player's side of it (the play screen drives these).
 uint8_t cursor();

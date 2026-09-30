@@ -20,8 +20,9 @@ namespace dbg {
 
 #if CHCH_DEBUG
 void poll();
+void paintStack();                  // at boot: for the stack high-water mark in P
+extern uint32_t *frameStackLo, *frameStackHi;   // the second stack (src/Frame.cpp)
 void markUpdateStart();
-void markWaitStart();
 void markRenderStart();
 void markRenderEnd();
 void print(const char *s);
@@ -43,8 +44,8 @@ uint32_t parseNum(const char *&p, uint8_t base);   // skips leading spaces/comma
 extern bool (*hook)(char cmd, const char *args);
 #else
 inline void poll() {}
+inline void paintStack() {}
 inline void markUpdateStart() {}
-inline void markWaitStart() {}
 inline void markRenderStart() {}
 inline void markRenderEnd() {}
 inline void print(const char *) {}

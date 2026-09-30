@@ -27,6 +27,30 @@ static uint64_t pcT0, pcSum, pcMax;
 
 namespace dbg {
 
+// Stack high-water mark: the stack is painted at boot, and P reports how
+// deep anything has reached since (the search plus a frame drawn from its
+// poll hook is the deepest path).
+#ifndef CHSIM
+extern "C" uint32_t _susrstack[], _eusrstack[];
+uint32_t *frameStackLo, *frameStackHi;      // src/Frame.cpp's stack for frames drawn mid-search
+static const uint32_t PAINT = 0xA5A5A5A5u;
+void paintStack() {
+    uint32_t here;
+    for (uint32_t *p = _susrstack; p < &here - 16; p++) *p = PAINT;
+    for (uint32_t *p = frameStackLo; p < frameStackHi; p++) *p = PAINT;
+}
+static uint32_t stackUsed(uint32_t *lo, uint32_t *hi) {
+    uint32_t *p = lo;
+    while (p < hi && *p == PAINT) p++;
+    return (uint32_t)((uint8_t *)hi - (uint8_t *)p);
+}
+#else
+void paintStack() {}
+static uint32_t stackUsed(uint32_t *, uint32_t *) { return 0; }
+static uint32_t *_susrstack, *_eusrstack;
+uint32_t *frameStackLo, *frameStackHi;
+#endif
+
 bool (*hook)(char cmd, const char *args) = nullptr;
 bool (*holdGame)() = nullptr;
 static char held[100];               // a game command waiting for the search to end
@@ -34,8 +58,8 @@ static char held[100];               // a game command waiting for the search to
 static char line[100];
 static uint8_t len = 0;
 static bool ackPending = false;
-static uint32_t tUpd, tWait, tRnd;
-static uint32_t sumUpd, sumWait, sumRnd, maxRnd, frames, late;
+static uint32_t tRnd;
+static uint32_t sumRnd, maxRnd, frames, late;
 static uint32_t lastFrameStart;
 #if CHCH_PROFILE
 static uint32_t profT, profSum[12], profFrames;
@@ -102,12 +126,7 @@ static void execute() {
     char *p = buf;
     switch (cmd) {
         case '?':
-            p = fmtStr(p, "CHCS " CHCH_VERSION);
-            p = kv(p, " frame=", arduboy.frameCount);
-            p = fmtStr(p, " lock=");
-            p = fmtInt(p, arduboy.lockstep);
-            fmtStr(p, "\n");
-            print(buf);
+            print("CHCS " CHCH_VERSION "\n");
             break;
         case 'S':
             gfx_wait();
@@ -123,8 +142,7 @@ static void execute() {
             break;
         case 'L':
             arduboy.lockstep = (*args == '1') ? 0 : -1;
-            fmtStr(kv(p, "OK ", arduboy.frameCount), "\n");
-            print(buf);
+            print("OK\n");
             break;
         case 'N':
             if (arduboy.lockstep < 0) arduboy.lockstep = 0;
@@ -133,12 +151,12 @@ static void execute() {
             break;
         case 'P': {
             uint32_t f = frames ? frames : 1;
-            p = kv(p, "PERF upd=", sumUpd / f);
-            p = kv(p, " wait=", sumWait / f);
-            p = kv(p, " rnd=", sumRnd / f);
+            p = kv(p, "PERF rnd=", sumRnd / f);
             p = kv(p, " max=", maxRnd);
             p = kv(p, " late=", late);
             p = kv(p, " frames=", frames);
+            p = kv(p, " stk=", stackUsed(_susrstack, _eusrstack));
+            p = kv(p, " fstk=", stackUsed(frameStackLo, frameStackHi));
 #ifdef CHSIM
             p = kv(p, " pcrnd=", (uint32_t)(pcSum / f));
             p = kv(p, " pcmax=", (uint32_t)pcMax);
@@ -146,7 +164,7 @@ static void execute() {
 #endif
             fmtStr(p, "\n");
             print(buf);
-            sumUpd = sumWait = sumRnd = maxRnd = frames = late = 0;
+            sumRnd = maxRnd = frames = late = 0;
             break;
         }
 #if CHCH_PROFILE
@@ -172,7 +190,8 @@ static void execute() {
             break;
 #endif
         default:
-            if (holdGame && holdGame()) { memcpy(held, line, sizeof held); break; }
+            // Mid-search: answer HELD now, OK/ERR once it has run.
+            if (holdGame && holdGame()) { memcpy(held, line, sizeof held); print("HELD\n"); break; }
             print(hook && hook(cmd, args) ? "OK\n" : "ERR\n");
             break;
     }
@@ -215,11 +234,9 @@ void markUpdateStart() {
     uint32_t now = micros();
     if (frames && arduboy.lockstep < 0 && now - lastFrameStart > 17500) late++;
     lastFrameStart = now;
-    tUpd = now;
 }
-void markWaitStart()   { tWait = micros(); sumUpd += tWait - tUpd; }
 void markRenderStart() {
-    tRnd = micros(); sumWait += tRnd - tWait;
+    tRnd = micros();
 #ifdef CHSIM
     pcT0 = sim_hostNanos();
 #endif

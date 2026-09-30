@@ -1,0 +1,55 @@
+# On the board: frame pacing per view, a real CPU turn (W: its time), stack.
+say G 1 0 0 1
+wait 60
+perf reset
+free 4
+perf idle_normal
+tap SELECT
+wait 20
+perf reset
+free 4
+perf idle_close
+tap SELECT
+wait 20
+perf reset
+free 3
+perf idle_map
+tap SELECT
+wait 20
+tap A
+wait 2
+perf reset
+free 3
+perf piece_selected
+tap B
+# Into a middlegame, both sides by hand (two players: wait out each hand-over).
+say M 12 28
+wait 100
+say M 52 36
+wait 100
+say M 6 21
+wait 100
+say M 57 42
+wait 100
+say M 5 26
+wait 100
+say M 61 34
+wait 100
+say M 10 18
+wait 100
+say M 62 45
+wait 100
+snap middlegame
+# A real CPU turn with frames drawn: SHARK, out of its book on move 3.
+say G 0 0 2 5
+wait 60
+say M 12 28
+free 3
+say M 6 21
+free 3
+say M 1 18
+perf reset
+free 12
+say W
+perf cpu_turn
+snap after_cpu

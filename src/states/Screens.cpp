@@ -40,6 +40,9 @@ static Overlay overlay;
 static uint8_t promoFrom, promoTo, promoSel;
 static uint8_t pendingAction;        // chosen from the pause menu while the CPU was thinking
 static bool statsCounted;
+#if CHCH_DEBUG
+static uint32_t thinkMs;            // the CPU's last search, wall time (debug W)
+#endif
 
 static const char *const OPPONENT[match::LEVELS] = {"ROOKIE", "REGULAR", "SHARK", "HIGH ROLLER", "THE HOUSE"};
 static const char *const OPP_LINE[match::LEVELS] = {
@@ -412,7 +415,13 @@ static void playUpdate(bool thinking) {
             if (match::humanToMove() && !stage::busy()) playInput();
             break;
     }
-    match::update(stage::busy());
+#if CHCH_DEBUG
+    uint32_t t0 = millis();
+#endif
+    match::update(stage::busy());          // the CPU's search runs in here
+#if CHCH_DEBUG
+    if (millis() - t0 > 100) thinkMs = millis() - t0;
+#endif
     stage::update(false);
     if (!match::active() && stage::overShown() && overlay != RESULT) {
         countResult();
@@ -527,9 +536,11 @@ static void optionsRender(uint32_t frame) {
         optField(OPT_TEXT[i], (uint8_t)(((uint8_t *)&opt)[i] + 1), value);
         text35x2(114 - text35x2Width(value), y, value, i == sel ? WHITE : FELT_LT);
     }
-    // Credits.
+#if !CHCH_LEAN
+    // Credits (device debug builds leave them out to fit the debug protocol).
     centred35(110, "ARDUCHESS ENGINE: PETER BROWN", SILVER);
     centred35(117, "FONT: PRESS PLAY ON TAPE", SILVER);
+#endif
 }
 
 // ---------------------------------------------------------------------------
@@ -541,7 +552,26 @@ static void optionsRender(uint32_t frame) {
 //   J <T|S|O>                               jump to title/setup/options
 //   X <fen>                                 (simulator) set up a position, two players
 static bool debugHook(char cmd, const char *args) {
+    char buf[48], *p;
     switch (cmd) {
+        case 'W':
+            // W: the CPU's last move: wall time (frames drawn meanwhile) and nodes.
+            p = fmtInt(fmtStr(buf, "THINK ms="), (int32_t)thinkMs);
+            p = fmtInt(fmtStr(p, " nodes="), (int32_t)eng::nodes());
+            fmtStr(p, "\n");
+            dbg::print(buf);
+            return true;
+        case 'Y': {
+            // Y: render cost by section on the board (table board overlays pieces hud fx, us).
+            uint32_t us[6];
+            gfx_wait();
+            stage::profile(us);
+            p = fmtStr(buf, "RPROF");
+            for (int k = 0; k < 6; k++) { *p++ = ' '; p = fmtInt(p, (int32_t)us[k]); }
+            fmtStr(p, "\n");
+            dbg::print(buf);
+            return true;
+        }
         case 'G': {
             match::Setup s;
             s.mode = (uint8_t)dbg::parseNum(args, 10);
@@ -558,6 +588,7 @@ static bool debugHook(char cmd, const char *args) {
             uint8_t p = (uint8_t)dbg::parseNum(args, 10);
             return match::play(f, to, p ? p : eng::QUEEN);
         }
+#ifdef CHSIM
         case 'J': {
             static const char K[] = "TSO";
             const char *q = strchr(K, args[0]);
@@ -566,6 +597,7 @@ static bool debugHook(char cmd, const char *args) {
             enter(S[q - K]);
             return true;
         }
+#endif
 #ifdef CHSIM
         case 'Q': {
             // Calibration for tools/chsim/perf.py: host ns for the primitives
@@ -596,7 +628,9 @@ static bool debugHook(char cmd, const char *args) {
     }
     return false;
 }
-static bool searching() { return match::cpuThinking(); }
+// Game commands wait while the CPU searches or plays (a scripted move
+// arrives when it is the human's turn, as a press would).
+static bool searching() { return match::cpuThinking() || (cur == Scr::Play && match::active() && !match::humanToMove()); }
 #endif
 
 // ---------------------------------------------------------------------------
@@ -635,9 +669,7 @@ void update(bool thinking) {
     fx::update();
 }
 
-void render(uint32_t frame, bool thinking) {
-    // While the CPU thinks, draw every other frame: the search gets the rest.
-    if (thinking && (frame & 1)) return;
+void render(uint32_t frame) {
     switch (cur) {
         case Scr::Title:   titleRender(frame); break;
         case Scr::Setup:   setupRender(frame); break;

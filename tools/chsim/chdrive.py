@@ -171,6 +171,8 @@ class Driver:
             if not line:
                 continue
             op, *args = line.split()
+            if getattr(self, "verbose", False):
+                print(">", line, flush=True)
             if op == "wait":
                 self.frames(int(args[0]))
             elif op == "tap":
@@ -197,9 +199,17 @@ class Driver:
                                duration=int(1000 * every / 60), loop=0)
             elif op == "say":
                 self.t.send(" ".join(args))
-                for _ in range(50):
+                for _ in range(10000):
                     line = self.t.readline()
-                    if line.startswith("LAPS"):
+                    if line.startswith("HELD"):
+                        # The CPU is searching: game commands wait for it,
+                        # and in lockstep it needs frames to finish.
+                        self.t.send("N 5")
+                        continue
+                    if line.startswith("OK ") and line[3:].strip().isdigit():
+                        self.t.send("N 5")         # a frame ack, still waiting
+                        continue
+                    if line.startswith(("LAPS", "BENCH", "THINK", "RPROF")):
                         print(line)
                     if line.startswith("OK"):
                         break
@@ -254,6 +264,7 @@ def main():
     g.add_argument("--device", action="store_true")
     ap.add_argument("--port")
     ap.add_argument("--id", default="CHCS", help="handshake prefix the game answers '?' with")
+    ap.add_argument("-v", "--verbose", action="store_true", help="echo each script line")
     ap.add_argument("-D", dest="defines", action="append", default=[])
     ap.add_argument("script")
     ap.add_argument("outdir")
@@ -264,6 +275,7 @@ def main():
     else:
         t = SerialTransport(a.port)
     d = Driver(t, a.id)
+    d.verbose = a.verbose
     try:
         d.run(a.script, a.outdir)
     finally:

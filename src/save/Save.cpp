@@ -2,10 +2,19 @@
 #include <Arduino.h>
 #include <string.h>
 #include <CHGfx.h>
+#include "../../config.h"
 #include "Save.h"
 
 namespace save {
 
+#if CHCH_LEAN
+// Device debug builds (the serial protocol) don't fit with this code and a
+// page left over to save in, so saving is left out of them.
+bool available() { return false; }
+bool load(Options &, Stats &, bool &hasGame) { hasGame = false; return false; }
+bool loadGame() { return false; }
+bool store(const Options &, const Stats &, bool) { return false; }
+#else
 static const uint32_t MAGIC = 0x53434843u;       // "CHCS"
 static const uint8_t VERSION = 1;
 static const uint32_t PAGE = 256;
@@ -153,5 +162,6 @@ bool store(const Options &o, const Stats &s, bool withGame) {
     lastSeq = rec.seq;
     return true;
 }
+#endif
 
 }  // namespace save

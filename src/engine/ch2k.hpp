@@ -13,7 +13,10 @@
  *     and same-coloured bishops (FIDE dead position), as the comment meant.
  *   - node counters are 32-bit on every build (the device and the PC
  *     simulator must search identically; levels go past 65535 nodes).
- *   - CH2K_POLL() is called every 256 nodes so the game can keep drawing
+ *   - the search's per-node helpers are kept out of line (CH2K_LEAF) so
+ *     link-time inlining cannot grow the recursive frames.
+ *   - CH2K_MAX_PLY caps the search depth (stack on a 2 KB part).
+ *   - CH2K_POLL() is called every CH2K_POLL_NODES nodes so the game can keep drawing
  *     while the engine thinks, and abort() stops a search cleanly.
  *   - negamax_root() can search with a margin below the best score so every
  *     root move within the margin gets an exact score; the last completed
@@ -30,9 +33,19 @@
 
 #include <stdint.h>
 
-// Called every 256 nodes from inside the search (see eval_relative).
+// Called every CH2K_POLL_NODES nodes (a power of two) from inside the search
+// (see eval_relative).
 #ifndef CH2K_POLL
 #define CH2K_POLL() ((void)0)
+#endif
+#ifndef CH2K_POLL_NODES
+#define CH2K_POLL_NODES 256
+#endif
+
+// Deepest ply the search reaches (quiescence stops here); at most
+// STATE_STACK_SIZE - 1 = 12. Each ply is ~80 bytes of stack.
+#ifndef CH2K_MAX_PLY
+#define CH2K_MAX_PLY 12
 #endif
 
 #ifndef CH2K_EXTRAS
@@ -48,6 +61,13 @@
 // ~900 bytes less flash and a little search efficiency.
 #ifndef CH2K_SEE
 #define CH2K_SEE 1
+#endif
+
+// Functions the search calls at each node but that do not recurse: kept out
+// of line, so their big frames are not multiplied by the search depth (a
+// 2 KB stack).
+#ifndef CH2K_LEAF
+#define CH2K_LEAF __attribute__((noinline))
 #endif
 
 // Root candidates kept for the near-best pick.
@@ -1019,20 +1039,20 @@ struct game
     u8 in_check;
 
     static constexpr u8 const GEN_MOVES_OUT_OF_MEM = 255;
-    u8 gen_moves(move* m);
+    CH2K_LEAF u8 gen_moves(move* m);
     bool en_passant_pinned(square king, square sa, square sb);
 
     // remove noncaptures
-    u8 reduce_qsearch(move* m, u8 n);
+    CH2K_LEAF u8 reduce_qsearch(move* m, u8 n);
 
-    u8 order_moves(move* m, u8 n); // returns starting index of bad caps
+    CH2K_LEAF u8 order_moves(move* m, u8 n); // returns starting index of bad caps
     s8 see_square(square s);
     s8 see_capture(move mv);
 
-    bool capturable(piece_color by_col, square x);
+    CH2K_LEAF bool capturable(piece_color by_col, square x);
 
-    void do_move(move m);
-    void undo_move(move m);
+    CH2K_LEAF void do_move(move m);
+    CH2K_LEAF void undo_move(move m);
 
     void do_null_move();
     void undo_null_move();
@@ -1095,7 +1115,7 @@ struct game
 
     score eval_relative()
     {
-        if(!(u8)++nodes_) CH2K_POLL();
+        if(!(++nodes_ & (CH2K_POLL_NODES - 1))) CH2K_POLL();
         score r;
         // endgame produces relative score
         if(endgame(r)) return r;
@@ -1116,7 +1136,7 @@ struct game
     }
 #endif
 
-    score eval_side(bool is_white);
+    CH2K_LEAF score eval_side(bool is_white);
 
     score draw_score() const
     {
@@ -1126,12 +1146,12 @@ struct game
     }
 
     bool check_draw_50move();
-    u8 check_draw_repetition();
-    bool check_draw_material();
+    CH2K_LEAF u8 check_draw_repetition();
+    CH2K_LEAF bool check_draw_material();
     bool check_draw_material_side(piece_color c);
 
     // check for draw by material or specific endgame scenario
-    bool endgame(score& s);
+    CH2K_LEAF bool endgame(score& s);
     // check one side for combinations
     bool endgame_side(piece_color c, score& s);
 
@@ -1469,7 +1489,7 @@ score game::qsearch(move* m, score a, score b)
 #endif
     //if(depth > max_depth_ * 2)
     //    return eval_relative_with_see();
-    if(state_index == STATE_STACK_SIZE - 1)
+    if(state_index >= CH2K_MAX_PLY)
         return eval_relative();
     if(stop_ || nodes_ > max_nodes_) return 0;
     u8 n = gen_moves(m);

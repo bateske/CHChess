@@ -5,14 +5,15 @@
 namespace match {
 
 // Node budget, how far below the best a move may score and still be picked
-// (centipawns), contempt (16 cp units). The budgets are first guesses: they
-// get tuned on the board so the strongest thinks for a few seconds.
+// (centipawns), contempt (16 cp units). Measured on the board: ~1,700
+// nodes/s alone, ~1,200 with the game running at 20 fps meanwhile, so these
+// think for about 0.3, 1, 2.5, 5 and 10 seconds.
 const eng::Level LEVEL[LEVELS] = {
-    {512, 150, 0},       // ROOKIE
-    {2048, 60, 0},       // REGULAR
-    {8192, 25, 0},       // SHARK
-    {32768, 10, 2},      // HIGH ROLLER: plays for the win
-    {131072, 0, 0},      // THE HOUSE
+    {400, 150, 0},       // ROOKIE
+    {1200, 60, 0},       // REGULAR
+    {3000, 25, 0},       // SHARK
+    {6000, 10, 2},       // HIGH ROLLER: plays for the win
+    {12000, 0, 0},       // THE HOUSE
 };
 
 uint8_t board[64];

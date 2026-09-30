@@ -1,0 +1,13 @@
+# On the board: render cost by section through a two-player hand-over.
+say G 1 0 0 1
+wait 90
+say Y
+say M 12 28
+wait 6
+say Y
+wait 8
+say Y
+wait 10
+say Y
+wait 20
+say Y

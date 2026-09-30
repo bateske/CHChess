@@ -19,6 +19,8 @@ static void engPoll() { if (eng::pollHook) eng::pollHook(); }
 #define CH2K_SEE 0          // MVV-LVA capture ordering: ~900 bytes smaller
 #define CH2K_RAND eng::rand8
 #define CH2K_POLL engPoll
+#define CH2K_POLL_NODES 8    // ~5 ms at the board's ~1,700 nodes/s: frames start on time
+#define CH2K_MAX_PLY 10      // 10 plies * ~80 B of stack, beside the game's own
 #include "ch2k.hpp"
 
 namespace eng {
@@ -172,6 +174,17 @@ Move think(const Level &lv) {
         if (n) best = g.pick_[ok[ch2k::nrand(n)]];
     }
     return pack(best);
+}
+
+Move benchThink(const Level &lv) {
+    uint16_t book = g.gd.opening_index_;
+    void (*hook)() = pollHook;
+    g.gd.opening_index_ = 0;
+    pollHook = nullptr;
+    Move m = think(lv);
+    pollHook = hook;
+    g.gd.opening_index_ = book;
+    return m;
 }
 
 void abort() { g.abort(); }
