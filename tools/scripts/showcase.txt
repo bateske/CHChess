@@ -12,13 +12,13 @@ tap UP
 gif select 24 2
 tap A
 gif cpu 150 2
-# The map and back, and the look-around spring.
+# The map and back, and B held to inspect the board.
 tap SELECT
 gif views 40 2
 tap SELECT
 wait 20
 hold B+RIGHT
-gif spring 30 2
+gif inspect 50 2
 release
 wait 30
 # A capture, knocked off the board.

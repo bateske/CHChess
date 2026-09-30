@@ -2,14 +2,15 @@
 
 Chess for the [CHGame](https://github.com/bateske/CH32SerialBoot) handheld
 (CH32X035 RISC-V, 128x128 colour LCD, piezo), in the casino style of
-[CHBlackjack](https://github.com/bateske/CHBlackjack): an isometric board on
-a casino carpet, a pointing glove to pick pieces up, legal moves lit with
-shimmering, marching borders, a camera that whips in close on every move
-(captures play out in slow motion), each move called out ("ROOK TAKES
-QUEEN ON A4"),
-captured pieces knocked off the board tumbling, CHECK! and CHECKMATE! in
-Blackjack's dancing gradient letters, and a CPU opponent whose red glove
-hovers over the pieces it is thinking about.
+[CHBlackjack](https://github.com/bateske/CHBlackjack): an isometric board, a
+pointing glove to pick pieces up, legal moves lit with shimmering, marching
+borders, a camera that whips in close on every move (captures play out in
+slow motion, the taken piece knocked tumbling off the board), each move
+called out ("ROOK TAKES QUEEN ON A4"), CHECK! and CHECKMATE! in
+Blackjack's dancing gradient letters, and a CPU opponent with a red glove
+of its own: it hovers over the pieces it is weighing while a soft clock
+ticks, then plays its move the way you do - picks the piece up, carries it
+to the square, pauses, and sets it down.
 
 A whole game against BEGINNER, from the title screen (two minutes,
 `tools/scripts/gameplay.txt`):
@@ -19,8 +20,8 @@ A whole game against BEGINNER, from the title screen (two minutes,
 | The CPU's turn | Capture | Checkmate |
 |---|---|---|
 | ![cpu](docs/cpu.gif) | ![capture](docs/capture.gif) | ![mate](docs/mate.gif) |
-| **Title** | **Look around** | **Promotion** |
-| ![title](docs/title.gif) | ![spring](docs/spring.gif) | ![promote](docs/promote.gif) |
+| **Title** | **Inspecting the board** | **Promotion** |
+| ![title](docs/title.gif) | ![inspect](docs/inspect.gif) | ![promote](docs/promote.gif) |
 
 (Captured from the PC simulator in `tools/chsim`, which runs the real game
 and graphics code and renders what the device shows.)
@@ -41,9 +42,10 @@ You need the Arduino IDE (2.x) or `arduino-cli`, and:
 3. **This repository**, in a folder named `CHChess`.
 
 The game needs **link-time optimisation** to fit the 50,944-byte application
-region (it is 50.2 KB with it, 56 KB without). With a board package that
-has it, pick *Tools > Optimize > Smallest + LTO*. From the command line, on
-any CHGame package:
+region (it is 50.3 KB with it, 56 KB without). With a board package that
+has it, pick *Tools > Optimize > Smallest + LTO* (see
+[docs/CH32SerialBoot-notes.md](docs/CH32SerialBoot-notes.md)). From the
+command line, on any CHGame package:
 
     arduino-cli compile -b CHGame:ch32v:CHGame:opt=osstd,rtlib=nano,periph=game --build-property build.extra_flags=-flto CHChess
     arduino-cli upload  -b CHGame:ch32v:CHGame -p COMx CHChess
@@ -74,11 +76,11 @@ it lands. A on a piece with no moves buzzes, and NO MOVES and the glove
 flash red. During your turn the other side's last move is lit in gold.
 
 Check is an event: CHECK! stays up until you press a button (as does
-CHECKMATE!, before the result: the only things that stop play), the king's square marches red, the king's body
-beats red, lub-dub, until you pick it up, and the glove only stops on the
-pieces that can get you out of it. The camera leans towards
-the middle of the board, so the selection is always in view without empty
-carpet at the edges.
+CHECKMATE!, before the result: the only things that stop play), the king's
+square marches red, the king's body beats red, lub-dub, until you pick it
+up, and the glove only stops on the pieces that can get you out of it. The
+camera leans towards the middle of the board, so the selection is always in
+view without empty carpet at the edges.
 
 Play one or two players. Against the CPU, choose your side and one of three
 opponents:
@@ -113,9 +115,14 @@ re-uploading.
   moment and taps again.
 * **The board** is drawn as 2:1 diamonds sampled at pixel centres, so every
   edge is a clean staircase at every zoom step (tiles 20x10 up to 40x20, a
-  pixel at a time); pieces are span-encoded sprites rendered from 3D models
-  (`tools/pieces.py`), one set recoloured for each side, scaled as the
-  camera zooms and stood on a flat grid for the map.
+  pixel at a time); pieces are hand-finished pixel art (first rendered from
+  3D models by `tools/pieces.py`) packed as span-encoded sprites, one set
+  recoloured for each side by a palette swap, scaled as the camera zooms
+  and stood on a flat grid for the map.
+* **Sound** is a piezo sequencer of short step lists: a knock for each
+  landing, a smash and spinning swoops for a capture, fanfares for mate,
+  and the CPU's clock, played on a narrow pulse so it stays in the
+  background.
 * **Undo and saved games** replay the move list from the start (or from a
   snapshot, in long games), which also keeps the opening book and the
   repetition rule right.
@@ -133,8 +140,9 @@ C++ compiler (zig, clang++ or g++ on the PATH, `pip install ziglang`, or
 * `python tools/chsim/chdrive.py --sim . tools/scripts/showcase.txt docs/` -
   runs the game from a script and writes the GIFs above (`gameplay.txt`,
   the whole game: `goto` walks the glove to a square with D-pad presses,
-  `waitturn` waits for your move, `rec` records across a script). `say X <fen>` sets
-  up a position, `say M <from> <to>` plays a move (squares 0 = a1 .. 63 = h8).
+  `waitturn` waits for your move, `rec` records across a script).
+  `say X <fen>` sets up a position, `say M <from> <to>` plays a move
+  (squares 0 = a1 .. 63 = h8).
   `cal` and `perf` in a script estimate the device's render time.
 * `python tools/device.py upload [--debug]` - build and upload (`--debug`
   adds the serial protocol for screenshots, injected input and lockstep).
@@ -149,6 +157,13 @@ C++ compiler (zig, clang++ or g++ on the PATH, `pip install ziglang`, or
 * `python tools/pieces.py` renders the pieces, `python tools/assets.py`
   packs the art, `python tools/book.py N` cuts the opening book to N plies,
   `python tools/audio/preview.py out/` renders the sound effects to WAV.
+
+## Notes for the platform
+
+What building this game taught about the board package and the graphics
+library, with suggestions:
+[docs/CH32SerialBoot-notes.md](docs/CH32SerialBoot-notes.md) and
+[docs/CHGfx-notes.md](docs/CHGfx-notes.md).
 
 ## License
 
