@@ -95,7 +95,7 @@ The weaker opponents choose at random among moves within a margin of the
 best one, so they make human-looking mistakes rather than random blunders.
 Your record against each is on the opponent screen (hold SELECT there to
 clear it). Options: sound, board colour (green, blue, red, purple felt),
-coordinates, and the pace (FUN, or QUICK: faster CPU turns and moves,
+and the pace (FUN, or QUICK: faster CPU turns and moves,
 and no zooming in on them). Options, records and a game in
 progress (SAVE + QUIT, then CONTINUE) are saved to flash and survive
 re-uploading.

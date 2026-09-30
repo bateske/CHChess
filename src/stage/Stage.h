@@ -40,7 +40,6 @@ void setZoom(uint8_t tileH);         // iso zoom now, 5..10 (the title's close-u
 // screen space push the view to the board's edge or corner that way.
 void inspect(bool on, int dx, int dy);
 void thinkPick();                    // mid-search: the CPU's glove to the piece it is weighing
-void setCoords(bool on);             // file/rank letters on the rim
 void setFast(bool on);               // quicker CPU turns and moves
 extern const char *opponentName;     // the HUD's name for the CPU
 extern const char *const NAMES[7];   // the pieces by eng type: "", "PAWN" .. "KING"

@@ -183,7 +183,6 @@ void setZoom(uint8_t h) {
     aimX = (int16_t)(aimX * h / o); aimY = (int16_t)(aimY * h / o);
     fx16 = fx16 * h / o; fy16 = fy16 * h / o;
 }
-void setCoords(bool on) { iso::coords = on; }
 void setFast(bool on) { fast = on; }
 uint8_t selected() { return humanTurn ? sel : 0xFF; }     // the player's
 void setBlocked(bool b) { blocked = b; }

@@ -12,7 +12,6 @@ namespace iso {
 Cam cam = {0, 40, false};
 uint8_t tileH = 5;
 bool flat;
-bool coords = true;
 uint8_t darkSq = FELT, lightSq = SKIN, tableCol = NAVY, tableShadow = INK;
 
 void setView(bool m) { flat = m; }
@@ -228,7 +227,7 @@ void drawBoard() {
         gfx_rect(MX - 2, MY - 2, 8 * MW + 4, 8 * MH + 4, GOLD);
         gfx_rect(MX - 1, MY - 1, 8 * MW + 2, 8 * MH + 2, INK);
         mapSquares(lightSq, darkSq);
-        for (int i = 0; coords && i < 8; i++) {
+        for (int i = 0; i < 8; i++) {
             label(MX + i * MW + MW / 2 - 1, MY + 8 * MH + 3, (char)('A' + (cam.flip ? 7 - i : i)));
             label(MX - 8, MY + i * MH + MH / 2 - 2, (char)('8' - (cam.flip ? 7 - i : i)));
         }
@@ -249,7 +248,7 @@ void drawBoard() {
 
     // Coordinates on the carpet below the near edges: files along the left
     // one, ranks along the right (reversed from Black's side).
-    for (int i = 0; coords && i < 8; i++) {
+    for (int i = 0; i < 8; i++) {
         int dx = (2 * i + 1) * hw() / 2, dy = (2 * i + 1) * hh() / 2 + s + 2 + z;
         label(xl + dx - 4, yl + dy, (char)('A' + (cam.flip ? 7 - i : i)));
         label(xb + dx + 2, yb - (2 * i + 1) * hh() / 2 + s + 2 + z, (char)('1' + (cam.flip ? 7 - i : i)));

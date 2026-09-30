@@ -51,7 +51,6 @@ inline int toScreenY(int wy) { return flat ? wy : wy - cam.y + CY; }
 
 // Colours: squares, table, shadow.
 extern uint8_t darkSq, lightSq, tableCol, tableShadow;
-extern bool coords;                          // letters/numbers round the board
 
 void drawTable();                            // the carpet
 void drawBoard();                            // slab or frame, squares, coordinates

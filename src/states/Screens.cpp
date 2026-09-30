@@ -94,7 +94,6 @@ static void persist(bool withGame) {
 static void applyOptions() {
     audio::setOn(opt.sound != 0);
     pal::setTheme(opt.felt);
-    stage::setCoords(opt.coords != 0);
     stage::setFast(opt.speed != 0);
 }
 
@@ -555,12 +554,12 @@ static void playRender(uint32_t frame) {
 // their tests start games directly)
 // ---------------------------------------------------------------------------
 #if !CHCH_LEAN
-enum Opt : uint8_t { O_SOUND, O_FELT, O_COORDS, O_SPEED, O_BACK, OPT_COUNT };
+enum Opt : uint8_t { O_SOUND, O_FELT, O_SPEED, O_BACK, OPT_COUNT };
 static const char *const OPT_TEXT[OPT_COUNT] = {
-    "SOUND|OFF|ON", "BOARD|GREEN|BLUE|RED|PURPLE", "COORDS|OFF|ON", "PACE|FUN|QUICK", "BACK",
+    "SOUND|OFF|ON", "BOARD|GREEN|BLUE|RED|PURPLE", "PACE|FUN|QUICK", "BACK",
 };
-// The option's byte in Options (past the retired hints byte).
-static uint8_t &optByte(uint8_t i) { return ((uint8_t *)&opt)[i + (i >= O_COORDS)]; }
+// The option's byte in Options (past the retired hints and coords bytes).
+static uint8_t &optByte(uint8_t i) { return ((uint8_t *)&opt)[i + (i >= O_SPEED ? 2 : 0)]; }
 
 static uint8_t optField(const char *s, uint8_t k, char *buf) {
     uint8_t n = 0;
@@ -766,7 +765,7 @@ static bool searching(char cmd) {
 // ---------------------------------------------------------------------------
 void begin() {
     stage::begin();
-    opt.sound = 1; opt.coords = 1;
+    opt.sound = 1;
     save::load(opt, stats, hasGame);
     applyOptions();
 #if CHCH_DEBUG
