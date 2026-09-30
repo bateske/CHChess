@@ -33,7 +33,7 @@ You need the Arduino IDE (2.x) or `arduino-cli`, and:
 3. **This repository**, in a folder named `CHChess`.
 
 The game needs **link-time optimisation** to fit the 50,944-byte application
-region (it is 48.4 KB with it, 52.5 KB without). With a board package that
+region (it is 49.1 KB with it, 54.8 KB without). With a board package that
 has it, pick *Tools > Optimize > Smallest + LTO*. From the command line, on
 any CHGame package:
 
