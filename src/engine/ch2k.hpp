@@ -22,7 +22,7 @@
  *     root move within the margin gets an exact score; the last completed
  *     iteration's candidates are kept (pick_[]) for a varied, fallible
  *     opponent.
- *   - the opening book is cut from 6 plies to 3 (tools/book.py) for flash.
+ *   - the opening book is cut from 6 plies to 2 (tools/book.py) for flash.
  *   - CH2K_SEE (default on, off in CHChess): capture ordering by static
  *     exchange evaluation, or by most valuable victim when off.
  *   - EEPROM save/load, FEN, printing, undo-by-unexecute and the unused
@@ -174,36 +174,18 @@ static u8 nrand(u8 n)
 // tree is serialized depth-first (children immediately follow parents)
 
 // parameters: MAX_DEPTH=6 MIN_COUNT=13 MIN_CHILDREN=1
-static constexpr u8 const OPENING_BOOK_MAX_DEPTH = 3;
-static u8 const OPENING_BOOK[210] PROGMEM =
+static constexpr u8 const OPENING_BOOK_MAX_DEPTH = 2;
+static u8 const OPENING_BOOK[66] PROGMEM =
 {
-    145,   5, 199,   5,  71, 146,  17, 146,
-      2,   5,   7,   8,  74, 130,  74, 133,
-      2,   4,   5,   9,  74, 132,  69, 135,
-      2,   5,   6,   7,   8,  74, 134,  71,
-    136,   5,   7,  74, 139,  71, 204,   5,
-      7,  73, 130, 146,  83,   5, 135,  83,
-    134,  83, 201,  83, 131,   7, 201,  83,
-    133,  17, 146,  16,  17,   6,  75, 130,
-     16,  70, 133,  15,  16,  74, 132,  17,
-      6,   8,  75, 134,  70, 137,  16,  17,
-      5,  75, 136,  16,  17,   6,  75,  11,
-    204,  16,  17,   6,   8,  75, 135, 145,
-     69, 146,  24,  25,  16,  18,   5,   8,
-     75, 133,  71, 132,  18,   5,  72, 135,
-     23,  24,  15,  17,   5,  70, 134,  18,
-      5,  72, 136,  18,   5,   8,  75, 139,
-     25,  16,  18,   5,   8,  75, 204,  18,
-      5,  72, 137, 145,  16,  81, 146,  16,
-     72, 130,  71, 133,  15,  16,  19,  17,
-      0,   2,   4,   6,   7,  10,  75, 132,
-     16,  19,  17,   5,   6,  71, 135,  17,
-     72, 134,  16,  17,  71, 137,  21,  15,
-     16,   7,  73, 136,  16,  17,  25,   6,
-     71, 204,  17,   5,  71, 139, 146,  81,
-    133,  81, 135,  81, 137,  74, 204,  17,
-     73, 204,  18, 135,  19,  81, 137,  19,
-     69,  76,
+    145,   5,  71, 146,  17,  18,   2,   5,
+      4,   7,   6,   8,  11,  76, 130,  18,
+      5,   7,   6,  73, 131,   7,  73, 133,
+     17,  18,   2,   5,   4,   6,   9,   8,
+     11,  76, 135,  17,  18,   5,   4,   7,
+      6,   8,  11,  76, 137,  17,  18,   2,
+      5,   4,   7,   6,   9,   8,  76, 139,
+     18,   5,   7,   9,  76, 204,  18,   7,
+      9,  76,
 };
 
 static constexpr u8 const PVALS[] PROGMEM =

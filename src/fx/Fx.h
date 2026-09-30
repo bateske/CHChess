@@ -36,7 +36,11 @@ bool activeRows(int &lo, int &hi);
 
 void clear();
 void update();                      // once per frame
-void drawParticles();
+// dust: the size of a DUST puff (2 at the board's usual size, more zoomed in).
+void drawParticles(uint8_t dust);
+bool particles();                    // any still flying
+constexpr uint8_t RAINBOW = 0xFF;    // particle colour: cycling through RAIN
+extern const uint8_t RAIN[5];        // the casino rainbow: red, gold, green, cyan, blue
 void drawBanner();
 void drawFloats();
 void applyShake(int y0, int y1);    // post-process rows y0..y1 of the framebuffer

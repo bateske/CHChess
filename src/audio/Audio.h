@@ -8,7 +8,7 @@
 
 enum class Sfx : uint8_t {
     Cursor, Select, Deny, Land, Hop, Capture, Coin, Check, Castle, Promote,
-    Whoosh, Flip, Mate, Win, Lose, Draw, Turn, Title, Tick, COUNT
+    Whoosh, Flip, Mate, Win, Lose, Draw, Turn, Title, COUNT
 };
 
 namespace audio {

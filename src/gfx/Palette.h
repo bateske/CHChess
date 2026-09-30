@@ -27,8 +27,9 @@ void setCycling(bool on);                   // rainbow FX_A + pulse FX_B
 // What FX_A/FX_B cycle through. CASINO: CHBlackjack's rainbow and gold/white
 // pulse (banners, titles, the cursor). TARGETS: while a piece is picked up,
 // FX_A shimmers cyan/white (squares it can move to) and FX_B pulses
-// red/gold (pieces it can take).
-enum Mode : uint8_t { CASINO, TARGETS };
+// red/gold (pieces it can take). HOVER: as CASINO, but FX_A fades black ->
+// white -> black over a second (the outline of the piece under the glove).
+enum Mode : uint8_t { CASINO, TARGETS, HOVER };
 void setMode(uint8_t m);
 void tick();                                // once per frame, before commit
 void resetClock();                          // debug: restart the FX_A/FX_B cycle

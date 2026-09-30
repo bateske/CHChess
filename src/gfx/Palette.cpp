@@ -78,7 +78,7 @@ void tick() {
         staged[FX_A] = SHIMMER[tri(ticks * 2) >> 1];
         staged[FX_B] = PULSE[tri(ticks * 2 + 16) >> 1];
     } else {
-        staged[FX_A] = RAINBOW[(ticks / 3) % 12];
+        staged[FX_A] = mode == HOVER ? (uint16_t)(tri(ticks >> 1) * 0x111) : RAINBOW[(ticks / 3) % 12];
         // FX_B: triangle wave GOLD <-> WHITE over 32 frames.
         uint8_t t = tri(ticks);
         uint8_t g = (uint8_t)(12 + (t * 3) / 15), b = (uint8_t)(2 + (t * 13) / 15);

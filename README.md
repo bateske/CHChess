@@ -56,10 +56,11 @@ any CHGame package:
 | SELECT | change view: the board, or the map (from above) | |
 | START | pause: resume, undo, resign, save + quit | |
 
-The glove only stops on your own pieces (the one under it blinks, the one
-you pick up gets a rainbow outline), or, holding one, on the squares it can
-go to (the one it is on filled solid). Each press takes it
-to the nearest spot in that direction as the screen shows it (diagonals
+The glove only stops on your own pieces (the one under it fades its outline
+black to white, the one you pick up gets a rainbow outline), or, holding
+one, on the squares it can go to (the one it is on blinks solid, a piece it
+would take is outlined red). Each press takes it to the nearest spot in
+that direction as the screen shows it (diagonals
 included, whatever the view); with nothing that way it wraps round to the
 farthest spot the other way, so pressing on steps through them all. A plate
 at the foot of the screen names what it is on ("KNIGHT G1", "BISHOP F1 NO
@@ -93,7 +94,7 @@ re-uploading.
 
 * **The engine** (ch2k, ~12 KB) is ArduChess's: a 0x88 board with fully
   legal move generation, alpha-beta with quiescence search, a Texel-tuned
-  evaluation and an opening book, cut here to three plies. It runs
+  evaluation and an opening book, cut here to two plies. It runs
   synchronously; every 8 nodes it calls back into the game, which keeps
   the game running while it thinks (the CPU's glove, the camera, the
   spinning chip), drawn at 20 fps so the search keeps most of the CPU.

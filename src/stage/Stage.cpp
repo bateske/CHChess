@@ -78,10 +78,11 @@ static uint8_t aimShift = 2;
 static int16_t sprX, sprY, sprVX, sprVY;
 static int8_t sprDX, sprDY;
 
-// The whip zoom: iso::tileH steps towards zoomTo (in, a step a frame; back
-// out, one every other), and zoomHold is the look at a landed move before
-// the camera pulls back.
-static uint8_t zoomTo = 5, zoomHold, zoomTick;
+// The whip zoom: iso::tileH steps towards zoomTo, one step each frame drawn
+// (a slow frame never bunches two), and after a landing the camera holds
+// (outWait) until its dust has cleared, then pulls back.
+static uint8_t zoomTo = 5;
+static bool outWait, zoomDrawn = true;
 // A capture plays out CAPTURE_SLOW times slower (slowF), to sell it.
 static const uint8_t CAPTURE_SLOW = 2;
 static uint8_t slowF = 1;
@@ -195,7 +196,7 @@ void setView(uint8_t v) {
     viewMode = v;
     iso::setView(v == MAP);
     setZoom(zoomTo = 5);
-    zoomHold = 0;
+    outWait = false;
     sprX = sprY = sprVX = sprVY = 0;
     aimSq(cur, 2);
     snapCamera();
@@ -219,21 +220,19 @@ void select(uint8_t sq, const uint8_t *to, const uint8_t *cap, uint8_t n) {
     nTgt = n;
     memcpy(tgt, to, n);
     memcpy(tgtCap, cap, n);
-    pal::setMode(pal::TARGETS);
     audio::sfx(Sfx::Select);
     int x, y;
     screenOf(sq, x, y);
-    fx::burst(fx::STAR, x, y - zoomed(10), 6, 20, GOLD);
+    fx::burst(fx::STAR, x, y - zoomed(art(shown[sq]).ay / 2 + 3), 8, 22, fx::RAINBOW);   // from the piece's middle
 }
 
 void deselect() {
     sel = 0xFF;
     nTgt = 0;
-    pal::setMode(pal::CASINO);
 }
 
 bool busy() {
-    return mv[0].on || mv[1].on || fly.on || holdT || picking || topT || handT || zoomHold ||
+    return mv[0].on || mv[1].on || fly.on || holdT || picking || topT || handT || outWait ||
            (tileH != zoomTo && !flat);
 }
 bool overShown() { return overDone; }
@@ -257,7 +256,8 @@ static void resetFromBoard() {
 static void onStart() {
     resetFromBoard();
     setZoom(zoomTo = 5);
-    zoomHold = annT = 0;
+    outWait = false;
+    annT = 0;
     handT = 0;
     turnBlack = match::blackToMove();
     bool black = match::setup.mode == match::VS_CPU ? match::setup.humanBlack : match::blackToMove();
@@ -376,7 +376,7 @@ static void land(Mover &m, bool main) {
     m.on = 0;
     int x, y;
     screenOf(m.to, x, y);
-    if (!main) { shown[m.to] = m.piece; fx::burst(fx::DUST, x, y, 12, 24, SILVER); return; }
+    if (!main) { shown[m.to] = m.piece; fx::burst(fx::DUST, x, y, 12, zoomed(24), SILVER); return; }
     const match::Event &e = pending;
     uint8_t piece = e.promo ? (uint8_t)(e.promo | (e.piece & eng::BLACK)) : e.piece;
     int up = zoomed(14);
@@ -401,7 +401,7 @@ static void land(Mover &m, bool main) {
         fx::shake(4, 1);
         audio::sfx(Sfx::Land);
     }
-    fx::burst(fx::DUST, x, y, 16, 30, SILVER);
+    fx::burst(fx::DUST, x, y, 16, zoomed(30), SILVER);
     shown[m.to] = piece;
     if (e.promo) {
         fx::burst(fx::STAR, x, y - up, 12, 36, GOLD);
@@ -414,7 +414,7 @@ static void land(Mover &m, bool main) {
     // Take in the landing, then pull back - unless it was mate: stay on it.
     match::Event nx;
     bool mate = match::peekEvent(nx) && nx.type == match::EV_OVER && nx.b == match::BY_MATE;
-    if (zoomTo > 5 && !mate) zoomHold = (uint8_t)((e.captured ? 30 : 20) * slowF);
+    outWait = zoomTo > 5 && !mate;
 }
 
 static void onCheck() {
@@ -501,15 +501,18 @@ void update(bool think) {
     }
 
     if (holdT) holdT--;
-    if (zoomHold && !--zoomHold) zoomTo = 5;
-    // In a step every other frame, back out a step every third. Going out,
-    // the camera jumps with each step to the move's new framing rather than
-    // drifting between them: clean steps, no wobble.
+    if (outWait && !fx::particles()) { outWait = false; zoomTo = 5; }
+    // Going out, the camera jumps with each step to the move's new framing
+    // rather than drifting between them: clean steps, no wobble.
     bool stepOut = false;
-    if (tileH != zoomTo && !flat && !(++zoomTick % (tileH < zoomTo ? 2 : 3))) {
+    if (tileH != zoomTo && !flat && zoomDrawn) {
         stepOut = tileH > zoomTo;
         setZoom((uint8_t)(tileH < zoomTo ? tileH + 1 : tileH - 1));
+        zoomDrawn = false;
     }
+    // The glove's piece: its outline fades black/white (HOVER); holding one,
+    // the squares shimmer (TARGETS).
+    pal::setMode(sel != 0xFF ? pal::TARGETS : humanTurn ? pal::HOVER : pal::CASINO);
     if (annT && ++annT > ANN_FRAMES) annT = 0;
     for (int k = 0; k < 2; k++) {
         Mover &m = mv[k];
@@ -624,10 +627,10 @@ static void drawOverlays(uint32_t frame) {
             else           { tileTint(tgt[i], in, CYAN); tileBorder(tgt[i], 0, FX_A, CYAN, ph); }
         }
     }
-    // Holding a piece, the square the glove is on is filled solid: gold to
-    // move there, red to take.
+    // Holding a piece, the square the glove is on blinks between dithered and
+    // solid: cyan to move there, red to take.
     bool cap = false;
-    if (humanTurn && sel != 0xFF && isTarget(cur, cap)) tileTint(cur, in, cap ? RED : GOLD, true);
+    if (humanTurn && sel != 0xFF && isTarget(cur, cap)) tileTint(cur, in, cap ? RED : CYAN, (frame >> 4) & 1);
     if (humanTurn) {
         if (sel != 0xFF) tileBorder(sel, 0, WHITE, WHITE, 0);
         tileBorder(cur, 0, sel != 0xFF ? WHITE : FX_B, GOLD, ph);
@@ -678,23 +681,26 @@ static void drawPieces(uint32_t frame) {
                 spriteRot(a.data, a.ax, a.ay, x, y, (uint8_t)((topDir * 60 * e) >> 8), zscale(), remapFor(p), false);
                 continue;
             }
-            // Picked up: its outline cycles the rainbow. Under the glove: the
-            // outline blinks white, unhurried.
+            // Outlines: picked up, the rainbow; under the glove, fading black to
+            // white (FX_A in the palette's HOVER mode); the piece the glove
+            // would take, red. Others that can be taken flash white.
             const uint8_t *rm = nullptr;
-            uint8_t hl[16];
-            if (humanTurn && (sq == sel || (sq == cur && sel == 0xFF))) {
-                static const uint8_t RAIN[5] = {RED, GOLD, FELT_LT, CYAN, BLUE};
+            uint8_t hl[16], edge = 0xFF;
+            bool cap = false, prey = sel != 0xFF && isTarget(sq, cap) && cap;
+            if (humanTurn && sq == sel) edge = fx::RAIN[(frame >> 3) % 5];
+            else if (humanTurn && sq == cur) edge = prey ? RED : FX_A;
+            if (edge != 0xFF) {
                 memcpy(hl, remapFor(p), 16);
-                hl[INK] = sq == sel ? RAIN[(frame >> 3) % 5] : ((frame >> 5) & 1 ? WHITE : INK);
+                hl[INK] = edge;
                 rm = hl;
+            } else if (prey && (frame & 8)) {
+                rm = RM_HIT;
             }
             if (sq == sel) {
                 fillEllipse(x, y, zoomed(3), (tileH + 2) / 5, INK);
                 y -= zoomed(3) + (zoomed(fx::isin((int)(frame >> 3) * 48)) >> 8);
             }
-            bool cap = false;
-            bool blink = sel != 0xFF && (frame & 8) && isTarget(sq, cap) && cap;
-            drawPiece(p, x, y, 0, blink ? RM_HIT : rm, zscale());
+            drawPiece(p, x, y, 0, rm, zscale());
         }
         for (int k = 0; k < 2; k++) if (mv[k].on && md[k] == d) drawMover(mv[k]);
     }
@@ -837,6 +843,7 @@ static uint32_t signature(uint32_t frame, uint32_t ui) {
 void invalidate() { lastSig = 0; }
 
 bool render(uint32_t frame, uint32_t ui) {
+    zoomDrawn = true;                            // the zoom may take its next step
     uint32_t sig = signature(frame, ui);
     if (sig == lastSig) return false;
     lastSig = sig;
@@ -846,7 +853,7 @@ bool render(uint32_t frame, uint32_t ui) {
     drawPieces(frame);
     drawFinger(frame);
     drawHud(frame);
-    fx::drawParticles();
+    fx::drawParticles((uint8_t)((2 * tileH + 2) / 5));
     fx::drawFloats();
     fx::drawBanner();
     fx::applyShake(10, 127);
@@ -858,7 +865,7 @@ bool render(uint32_t frame, uint32_t ui) {
 // averaged over 8 draws of the current scene.
 static void profTable(uint32_t) { drawTable(); }
 static void profBoard(uint32_t) { drawBoard(); }
-static void profFx(uint32_t) { fx::drawParticles(); fx::drawFloats(); fx::drawBanner(); }
+static void profFx(uint32_t) { fx::drawParticles(2); fx::drawFloats(); fx::drawBanner(); }
 void profile(uint32_t *us) {
     static void (*const PART[6])(uint32_t) = {profTable, profBoard, drawOverlays, drawPieces, drawHud, profFx};
     for (int k = 0; k < 6; k++) {

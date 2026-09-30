@@ -63,14 +63,13 @@ static const Step TURN[]    = { S(2637, 0, 40), S(3520, 0, 90) };
 static const Step TITLE[]   = {
     S(1568, 0, 90), S(2093, 0, 90), S(2637, 0, 90), S(3136, 0, 180), REST(40),
     S(2637, 0, 90), S(3136, 0, 360) };
-static const Step TICK[]    = { S(3000, 0, 4) };
 
 struct SfxDef { const Step *steps; uint8_t n, prio; };
 #define DEF(a, p) { a, (uint8_t)(sizeof(a) / sizeof(a[0])), p }
 static const SfxDef DEFS[(int)Sfx::COUNT] = {
     DEF(CURSOR, 0), DEF(SELECT, 1), DEF(DENY, 1), DEF(LAND, 1), DEF(HOP, 1), DEF(CAPTURE, 2),
     DEF(COIN, 1), DEF(CHECK, 3), DEF(CASTLE, 2), DEF(PROMOTE, 3), DEF(WHOOSH, 1), DEF(FLIP, 1),
-    DEF(MATE, 4), DEF(WIN, 4), DEF(LOSE, 4), DEF(DRAW, 4), DEF(TURN, 1), DEF(TITLE, 2), DEF(TICK, 0),
+    DEF(MATE, 4), DEF(WIN, 4), DEF(LOSE, 4), DEF(DRAW, 4), DEF(TURN, 1), DEF(TITLE, 2),
 };
 
 // --- Sequencer state (shared with the 1 kHz interrupt) ----------------------

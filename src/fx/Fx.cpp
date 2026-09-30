@@ -57,6 +57,12 @@ int rndRange(int lo, int hi) { return hi > lo ? lo + (int)(rnd() % (uint32_t)(hi
 // ---------------------------------------------------------------------------
 struct Particle { int16_t x, y; int8_t vx, vy; uint8_t life, colour, kind, age; };
 static Particle parts[48];
+const uint8_t RAIN[5] = {RED, GOLD, FELT_LT, CYAN, BLUE};
+
+bool particles() {
+    for (auto &p : parts) if (p.life) return true;
+    return false;
+}
 
 void spawn(Kind k, int x, int y, int vx, int vy, uint8_t life, uint8_t colour) {
     Particle *slot = nullptr;
@@ -104,27 +110,29 @@ static void updateParticles() {
     }
 }
 
-void drawParticles() {
+void drawParticles(uint8_t dust) {
     for (auto &p : parts) {
         if (!p.life) continue;
         int x = p.x >> 4, y = p.y >> 4;
+        uint8_t c = p.colour == RAINBOW ? RAIN[((p.age >> 2) + (&p - parts)) % 5] : p.colour;
         switch (p.kind) {
             case SPARK:
-                gfx_pixel(x, y, p.colour);
-                if (p.age < 8) { gfx_pixel(x - 1, y, p.colour); gfx_pixel(x + 1, y, p.colour);
-                                 gfx_pixel(x, y - 1, p.colour); gfx_pixel(x, y + 1, p.colour); }
+                gfx_pixel(x, y, c);
+                if (p.age < 8) { gfx_pixel(x - 1, y, c); gfx_pixel(x + 1, y, c);
+                                 gfx_pixel(x, y - 1, c); gfx_pixel(x, y + 1, c); }
                 break;
             case CONFETTI:
-                if ((p.age >> 2) & 1) gfx_hline(x, y, 2, p.colour);
-                else gfx_vline(x, y, 2, p.colour);
+                if ((p.age >> 2) & 1) gfx_hline(x, y, 2, c);
+                else gfx_vline(x, y, 2, c);
                 break;
             case STAR:
-                gfx_hline(x - 1, y, 3, p.colour); gfx_vline(x, y - 1, 3, p.colour);
+                gfx_hline(x - 1, y, 3, c); gfx_vline(x, y - 1, 3, c);
                 break;
-            case DUST:                                    // a 2x2 puff, down to a speck
-                if (p.life > 10) gfx_fillRect(x, y, 2, 2, p.colour);
-                else if (p.life > 4 || (p.life & 1)) gfx_pixel(x, y, p.colour);
+            case DUST: {                                  // a puff, down to a speck
+                int s = p.life > 10 ? dust : (p.life > 4 || (p.life & 1)) ? (dust + 1) / 2 : 0;
+                gfx_fillRect(x, y, s, s, c);
                 break;
+            }
         }
     }
 }
@@ -160,7 +168,6 @@ void drawBanner() {
     // Last few frames: blink out.
     if (bannerFrames < 10 && (bannerFrames & 2)) return;
     uint8_t ramp[32];
-    static const uint8_t RAIN[5] = {RED, GOLD, FELT_LT, CYAN, BLUE};
     for (int r = 0; r < h + 5 && r < 32; r++) {
         switch (bannerStyle) {
             case B_RAINBOW: ramp[r] = RAIN[((r / 2) + t / 3) % 5]; break;
