@@ -134,16 +134,15 @@ RAMFUNC(isotint) static void tintSpan(int x0, int x1, int y, uint8_t c) {
     for (int x = x0 + ((x0 + y) & 1); x < x1; x += 2) nib(x, y, c);
 }
 
-void tileTint(uint8_t sq, uint8_t inset, uint8_t c) {
+void tileTint(uint8_t sq, uint8_t inset, uint8_t c, bool solid) {
     int cx, top;
     if (!tileOnScreen(sq, cx, top)) return;
     int rows = flat ? MH : 2 * hh();
     for (int k = inset; k < rows - inset; k++) {
-        if (flat) tintSpan(cx + inset, cx + MW - inset, top + k, c);
-        else {
-            int w = halfWidth(k, rows) - 2 * inset;
-            tintSpan(cx - w, cx + w, top + k, c);
-        }
+        int a = cx + inset, b = cx + MW - inset;
+        if (!flat) { int w = halfWidth(k, rows) - 2 * inset; a = cx - w; b = cx + w; }
+        if (solid) gfx_hline(a, top + k, b - a, c);
+        else tintSpan(a, b, top + k, c);
     }
 }
 

@@ -4,9 +4,9 @@ Chess for the [CHGame](https://github.com/bateske/CH32SerialBoot) handheld
 (CH32X035 RISC-V, 128x128 colour LCD, piezo), in the casino style of
 [CHBlackjack](https://github.com/bateske/CHBlackjack): an isometric board on
 a casino carpet, a pointing glove to pick pieces up, legal moves lit with
-shimmering, marching borders, a camera that takes a beat and then whips in
-close on every move (captures play out in slow motion), each move called
-out ("ROOK TAKES QUEEN ON A4"),
+shimmering, marching borders, a camera that whips in close on every move
+(captures play out in slow motion), each move called out ("ROOK TAKES
+QUEEN ON A4"),
 captured pieces knocked off the board tumbling, CHECK! and CHECKMATE! in
 Blackjack's dancing gradient letters, and a CPU opponent whose red glove
 hovers over the pieces it is thinking about.
@@ -56,8 +56,9 @@ any CHGame package:
 | SELECT | change view: the board, or the map (from above) | |
 | START | pause: resume, undo, resign, save + quit | |
 
-The glove only stops on your own pieces (the one under it gets a rainbow
-outline), or, holding one, on the squares it can go to. Each press takes it
+The glove only stops on your own pieces (the one under it blinks, the one
+you pick up gets a rainbow outline), or, holding one, on the squares it can
+go to (the one it is on filled solid). Each press takes it
 to the nearest spot in that direction as the screen shows it (diagonals
 included, whatever the view); with nothing that way it wraps round to the
 farthest spot the other way, so pressing on steps through them all. A plate
@@ -121,6 +122,14 @@ C++ compiler (zig, clang++ or g++ on the PATH, `pip install ziglang`, or
   `cal` and `perf` in a script estimate the device's render time.
 * `python tools/device.py upload [--debug]` - build and upload (`--debug`
   adds the serial protocol for screenshots, injected input and lockstep).
+* **Editing the art:** `python tools/sheet.py export` writes
+  `tools/art/sheet.png`, an indexed PNG on the game's palette (transparent
+  background, swatch included): the pieces and glove as drawn (MASTER), the
+  pieces as White and as Black, and the palette swap between them as a key.
+  Edit it (Photoshop keeps it indexed), then `python tools/sheet.py import`
+  turns MASTER edits into `tools/art/pieces/` and the glove, recolouring on
+  the White/Black rows or the key into `tools/art/sides.txt`, and rebuilds
+  the assets. Details at the top of `tools/sheet.py`.
 * `python tools/pieces.py` renders the pieces, `python tools/assets.py`
   packs the art, `python tools/book.py N` cuts the opening book to N plies,
   `python tools/audio/preview.py out/` renders the sound effects to WAV.

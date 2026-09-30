@@ -58,7 +58,8 @@ void drawBoard();                            // slab or frame, squares, coordina
 // Border of a square, `inset` px in from its edge. With c2 != c the border
 // is dashed and `phase` marches the dashes round.
 void tileBorder(uint8_t sq, uint8_t inset, uint8_t c, uint8_t c2, uint8_t phase);
-// Half of a square's pixels (checkerboard) in c, inset in from its edge.
-void tileTint(uint8_t sq, uint8_t inset, uint8_t c);
+// Half of a square's pixels (checkerboard) in c, or all of them (solid),
+// inset in from its edge.
+void tileTint(uint8_t sq, uint8_t inset, uint8_t c, bool solid = false);
 
 }  // namespace iso

@@ -21,20 +21,13 @@ using namespace iso;
 // ---------------------------------------------------------------------------
 // Colour remaps for the art (its neutral tones -> a side, and effects)
 // ---------------------------------------------------------------------------
-static uint8_t RM_W[16], RM_B[16], RM_HIT[16], RM_CPU[16], RM_ID[16];
+// Each side's colours come from tools/art/sides.txt (SIDE_REMAP). Effects:
+static const uint8_t RM_ID[16] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+static const uint8_t RM_CPU[16] = {0, 1, 2, 3, 4, 5, 6, 7, RED, WINE, 10, 11, 12, 13, 14, 15};   // the CPU's red glove
+static const uint8_t RM_HIT[16] = {INK, WHITE, WHITE, WHITE, WHITE, WHITE, WHITE, WHITE,
+                                   WHITE, WHITE, WHITE, WHITE, WHITE, WHITE, WHITE, WHITE};   // struck: a white flash
 
-static void initRemaps() {
-    for (uint8_t i = 0; i < 16; i++) RM_W[i] = RM_B[i] = RM_CPU[i] = RM_ID[i] = i, RM_HIT[i] = WHITE;
-    // Body tones dark to light are BLUE, NAVY, SILVER, WHITE, then CYAN's
-    // glint (tools/pieces.py). Black keeps its darkest tone off INK, so the
-    // outline still draws the silhouette.
-    RM_W[NAVY] = SILVER; RM_W[SILVER] = WHITE; RM_W[CYAN] = WHITE;
-    RM_B[BLUE] = NAVY; RM_B[SILVER] = NAVY; RM_B[WHITE] = BLUE; RM_B[CYAN] = SILVER;
-    RM_HIT[INK] = INK;
-    RM_CPU[GOLD] = RED; RM_CPU[WOOD] = WINE;
-}
-
-static const uint8_t *remapFor(uint8_t p) { return (p & eng::BLACK) ? RM_B : RM_W; }
+static const uint8_t *remapFor(uint8_t p) { return SIDE_REMAP[(p & eng::BLACK) ? 1 : 0]; }
 static const PieceArt &art(uint8_t p) { return PIECE_ART[(p & eng::TYPE) - 1]; }
 
 // ---------------------------------------------------------------------------
@@ -89,10 +82,9 @@ static int8_t sprDX, sprDY;
 // out, one every other), and zoomHold is the look at a landed move before
 // the camera pulls back.
 static uint8_t zoomTo = 5, zoomHold, zoomTick;
-// Before it, a beat on the piece; a capture plays out CAPTURE_SLOW times
-// slower (slowF), to sell it.
-static const uint8_t WHIP_BEAT = 14, CAPTURE_SLOW = 4;
-static uint8_t beatT, slowF = 1;
+// A capture plays out CAPTURE_SLOW times slower (slowF), to sell it.
+static const uint8_t CAPTURE_SLOW = 2;
+static uint8_t slowF = 1;
 static bool blocked;                 // the piece under the glove has no move
 
 // The last move in words where the hover plate goes, popping up word by
@@ -241,7 +233,7 @@ void deselect() {
 }
 
 bool busy() {
-    return mv[0].on || mv[1].on || fly.on || holdT || picking || topT || handT || zoomHold || beatT ||
+    return mv[0].on || mv[1].on || fly.on || holdT || picking || topT || handT || zoomHold ||
            (tileH != zoomTo && !flat);
 }
 bool overShown() { return overDone; }
@@ -337,19 +329,18 @@ static void onMove(const match::Event &e) {
     humanTurn = false;
     thinking = false;
     deselect();
-    // The whip (not on the map, nor at QUICK pace): a beat on the piece,
-    // then the camera dives in as it lifts.
+    // The whip (not on the map, nor at QUICK pace): the camera dives in as
+    // the piece lifts.
     bool whip = !flat && !fast;
     slowF = whip && e.captured ? CAPTURE_SLOW : 1;
-    beatT = whip ? (uint8_t)(WHIP_BEAT * slowF) : 0;
-    uint8_t wait = whip ? (uint8_t)(beatT + 6) : 0;
+    if (whip) { zoomTo = 10; audio::sfx(Sfx::Whoosh); }
     shown[e.a] = 0;
     bool knight = (e.piece & eng::TYPE) == eng::KNIGHT;
-    launch(mv[0], e.piece, e.a, e.b, knight ? 12 : 3, wait, knight ? (uint8_t)Sfx::Hop + 1 : 0);
+    launch(mv[0], e.piece, e.a, e.b, knight ? 12 : 3, 0, knight ? (uint8_t)Sfx::Hop + 1 : 0);
     if (e.rookFrom != 0xFF) {
         uint8_t rook = shown[e.rookFrom];
         shown[e.rookFrom] = 0;
-        launch(mv[1], rook, e.rookFrom, e.rookTo, 10, (uint8_t)(wait + 10), (uint8_t)Sfx::Castle + 1);
+        launch(mv[1], rook, e.rookFrom, e.rookTo, 10, 10, (uint8_t)Sfx::Castle + 1);
     }
 }
 
@@ -385,7 +376,7 @@ static void land(Mover &m, bool main) {
     m.on = 0;
     int x, y;
     screenOf(m.to, x, y);
-    if (!main) { shown[m.to] = m.piece; fx::burst(fx::DUST, x, y, 6, 16, SILVER); return; }
+    if (!main) { shown[m.to] = m.piece; fx::burst(fx::DUST, x, y, 12, 24, SILVER); return; }
     const match::Event &e = pending;
     uint8_t piece = e.promo ? (uint8_t)(e.promo | (e.piece & eng::BLACK)) : e.piece;
     int up = zoomed(14);
@@ -410,7 +401,7 @@ static void land(Mover &m, bool main) {
         fx::shake(4, 1);
         audio::sfx(Sfx::Land);
     }
-    fx::burst(fx::DUST, x, y, 7, 18, SILVER);
+    fx::burst(fx::DUST, x, y, 16, 30, SILVER);
     shown[m.to] = piece;
     if (e.promo) {
         fx::burst(fx::STAR, x, y - up, 12, 36, GOLD);
@@ -461,9 +452,7 @@ static void onOver(uint8_t result, uint8_t reason) {
     }
 }
 
-void begin() {
-    initRemaps();
-}
+void begin() {}
 
 // ---------------------------------------------------------------------------
 // Per tick
@@ -512,11 +501,15 @@ void update(bool think) {
     }
 
     if (holdT) holdT--;
-    if (beatT && !--beatT) { zoomTo = 10; audio::sfx(Sfx::Whoosh); }
     if (zoomHold && !--zoomHold) zoomTo = 5;
-    // In a step every other frame, back out a step every third.
-    if (tileH != zoomTo && !flat && !(++zoomTick % (tileH < zoomTo ? 2 : 3)))
+    // In a step every other frame, back out a step every third. Going out,
+    // the camera jumps with each step to the move's new framing rather than
+    // drifting between them: clean steps, no wobble.
+    bool stepOut = false;
+    if (tileH != zoomTo && !flat && !(++zoomTick % (tileH < zoomTo ? 2 : 3))) {
+        stepOut = tileH > zoomTo;
         setZoom((uint8_t)(tileH < zoomTo ? tileH + 1 : tileH - 1));
+    }
     if (annT && ++annT > ANN_FRAMES) annT = 0;
     for (int k = 0; k < 2; k++) {
         Mover &m = mv[k];
@@ -546,6 +539,8 @@ void update(bool think) {
         int x, y;
         worldOf(topSq, x, y);
         aimAt(x, y + zoomed(8), 3);          // the fallen king above the result panel
+    } else if (tileH > zoomTo && !flat) {
+        aimSq(pending.b, 2);                 // pulling back from the move
     } else if (think || picking) {
         if (think) {
             thinkT = (uint8_t)(thinkT < 255 ? thinkT + 1 : 255);
@@ -584,6 +579,7 @@ void update(bool think) {
         pal::setFade((uint8_t)(dipT > 4 ? 16 - (8 - dipT) * 3 : 16 - dipT * 3));
     }
     if (humanTurn) fingerSq = cur;
+    if (stepOut) snapCamera();
     stepCamera();
 
     // The finger glides to its square.
@@ -628,6 +624,10 @@ static void drawOverlays(uint32_t frame) {
             else           { tileTint(tgt[i], in, CYAN); tileBorder(tgt[i], 0, FX_A, CYAN, ph); }
         }
     }
+    // Holding a piece, the square the glove is on is filled solid: gold to
+    // move there, red to take.
+    bool cap = false;
+    if (humanTurn && sel != 0xFF && isTarget(cur, cap)) tileTint(cur, in, cap ? RED : GOLD, true);
     if (humanTurn) {
         if (sel != 0xFF) tileBorder(sel, 0, WHITE, WHITE, 0);
         tileBorder(cur, 0, sel != 0xFF ? WHITE : FX_B, GOLD, ph);
@@ -678,12 +678,14 @@ static void drawPieces(uint32_t frame) {
                 spriteRot(a.data, a.ax, a.ay, x, y, (uint8_t)((topDir * 60 * e) >> 8), zscale(), remapFor(p), false);
                 continue;
             }
-            // Your piece under the glove, or picked up: a rainbow outline.
+            // Picked up: its outline cycles the rainbow. Under the glove: the
+            // outline blinks white, unhurried.
             const uint8_t *rm = nullptr;
             uint8_t hl[16];
             if (humanTurn && (sq == sel || (sq == cur && sel == 0xFF))) {
+                static const uint8_t RAIN[5] = {RED, GOLD, FELT_LT, CYAN, BLUE};
                 memcpy(hl, remapFor(p), 16);
-                hl[INK] = FX_A;
+                hl[INK] = sq == sel ? RAIN[(frame >> 3) % 5] : ((frame >> 5) & 1 ? WHITE : INK);
                 rm = hl;
             }
             if (sq == sel) {

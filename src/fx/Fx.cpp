@@ -72,7 +72,9 @@ void burst(Kind k, int x, int y, uint8_t n, int speed, uint8_t colour) {
     for (uint8_t i = 0; i < n; i++) {
         int a = (int)(i * 256 / n) + rndRange(0, 12);
         int sp = speed / 2 + rndRange(0, speed / 2 + 1);
-        spawn(k, x, y, (isin(a + 64) * sp) >> 8, (isin(a) * sp) >> 8, (uint8_t)rndRange(20, 40), colour);
+        int vy = (isin(a) * sp) >> 8;
+        if (k == DUST) vy /= 2;                           // puffs spread along the floor
+        spawn(k, x, y, (isin(a + 64) * sp) >> 8, vy, (uint8_t)rndRange(20, 40), colour);
     }
 }
 
@@ -119,7 +121,10 @@ void drawParticles() {
             case STAR:
                 gfx_hline(x - 1, y, 3, p.colour); gfx_vline(x, y - 1, 3, p.colour);
                 break;
-            case DUST: if (p.life > 4 || (p.life & 1)) gfx_pixel(x, y, p.colour); break;
+            case DUST:                                    // a 2x2 puff, down to a speck
+                if (p.life > 10) gfx_fillRect(x, y, 2, 2, p.colour);
+                else if (p.life > 4 || (p.life & 1)) gfx_pixel(x, y, p.colour);
+                break;
         }
     }
 }

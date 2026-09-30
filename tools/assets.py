@@ -8,7 +8,11 @@ Sources:
     <name>.anchor file: the base centre, in pixels from the top-left.
     Colours are the neutral tones pieces.py documents; the game remaps them
     per side.
-  * Small art as palette-letter text in tools/art/*.txt (the pointing hand).
+  * The palette swap that dresses the pieces as each side: tools/art/sides.txt.
+  * The pointing hand: tools/art/hand.png if present, else palette-letter
+    text in tools/art/hand.txt.
+  * tools/sheet.py exports all of it as one sprite sheet to edit, and imports
+    the edited sheet back into these files.
 
 Outputs:
   src/assets/Assets.h / Assets.cpp   - generated, do not edit
@@ -33,6 +37,66 @@ LETTER = {"k": 0, "w": 1, "d": 2, "f": 3, "g": 4, "s": 5, "r": 6, "m": 7,
           "y": 8, "b": 9, "u": 10, "n": 11, "p": 12, "c": 13, "x": 14, "z": 15}
 TRANSPARENT = 16
 PIECES = ["pawn", "knight", "bishop", "rook", "queen", "king"]
+NAMES = ["INK", "WHITE", "FELT_DK", "FELT", "FELT_LT", "SILVER", "RED", "WINE",
+         "GOLD", "WOOD", "BLUE", "NAVY", "SKIN", "CYAN", "FX_A", "FX_B"]
+SIDES = ART / "sides.txt"
+SIDES_HEADER = """# The palette swap that dresses the one set of piece art as each side.
+# The art (tools/art/pieces/, else tools/art/gen/) is drawn in neutral
+# tones - body BLUE, NAVY, SILVER, WHITE from dark to light, a CYAN glint,
+# INK outline, GOLD and WOOD trim. One line per art colour the swap
+# changes: the art colour, then White's colour, then Black's (names as in
+# src/gfx/Palette.h). Colours not listed stay as drawn.
+#
+# tools/sheet.py import rewrites this from an edited sheet.
+"""
+
+
+def load_sides():
+    """tools/art/sides.txt -> [white, black], each art colour -> side colour (16 entries)."""
+    maps = [list(range(16)), list(range(16))]
+    for ln in SIDES.read_text().splitlines():
+        words = ln.split("#", 1)[0].split()
+        if not words:
+            continue
+        a, w, b = (NAMES.index(n) for n in words)
+        maps[0][a], maps[1][a] = w, b
+    return maps
+
+
+def save_sides(maps):
+    lines = [f"{NAMES[a]:<8} {NAMES[maps[0][a]]:<8} {NAMES[maps[1][a]]}"
+             for a in range(16) if maps[0][a] != a or maps[1][a] != a]
+    SIDES.write_text(SIDES_HEADER + "\n".join(lines) + "\n", newline="\n")
+
+
+def piece_source(name):
+    """The piece's art file: hand-finished in tools/art/pieces/, else as rendered."""
+    src = ART / "pieces" / f"{name}.png"
+    return src if src.exists() else ART / "gen" / f"{name}.png"
+
+
+def load_piece(name):
+    """-> rows of palette indices, and the base centre (ax, ay)."""
+    src = piece_source(name)
+    ax, ay = (int(v) for v in src.with_suffix(".anchor").read_text().split())
+    return load_png(src), ax, ay
+
+
+def load_hand():
+    png = ART / "hand.png"
+    return load_png(png) if png.exists() else load_art("hand")[0]
+
+
+def save_png(path, img):
+    """Rows of palette indices -> a palette-exact RGBA PNG (what load_png reads)."""
+    h, w = len(img), len(img[0])
+    im = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    for y in range(h):
+        for x in range(w):
+            if img[y][x] != TRANSPARENT:
+                im.putpixel((x, y), rgb(img[y][x]) + (255,))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    im.save(path)
 
 
 def rgb(i):
@@ -143,11 +207,7 @@ def main():
     # Pieces.
     table = []
     for name in PIECES:
-        src = ART / "pieces" / f"{name}.png"
-        if not src.exists():
-            src = ART / "gen" / f"{name}.png"
-        img = load_png(src)
-        ax, ay = (int(v) for v in src.with_suffix(".anchor").read_text().split())
+        img, ax, ay = load_piece(name)
         data = pack_span4(img)
         defs.append(c_array(f"PIECE_{name.upper()}", data))
         table.append((f"PIECE_{name.upper()}", ax, ay))
@@ -159,8 +219,15 @@ def main():
                  "extern const PieceArt PIECE_ART[6];                          // pawn, knight, bishop, rook, queen, king")
     total += 6 * 8
 
+    # Each side's colours for the art.
+    maps = load_sides()
+    defs.append("const uint8_t SIDE_REMAP[2][16] = {\n" +
+                "".join("    {" + ", ".join(str(v) for v in m) + "},\n" for m in maps) + "};")
+    decls.append("extern const uint8_t SIDE_REMAP[2][16];                      // art colour -> White's, Black's (tools/art/sides.txt)")
+    total += 32
+
     # The pointing hand (span4).
-    hand = load_art("hand")[0]
+    hand = load_hand()
     data = pack_span4(hand)
     defs.append(c_array("HAND", data))
     decls.append("extern const uint8_t HAND[];                                 // span4, fingertip at bottom centre")

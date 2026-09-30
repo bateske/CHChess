@@ -1,0 +1,13 @@
+# The palette swap that dresses the one set of piece art as each side.
+# The art (tools/art/pieces/, else tools/art/gen/) is drawn in neutral
+# tones - body BLUE, NAVY, SILVER, WHITE from dark to light, a CYAN glint,
+# INK outline, GOLD and WOOD trim. One line per art colour the swap
+# changes: the art colour, then White's colour, then Black's (names as in
+# src/gfx/Palette.h). Colours not listed stay as drawn.
+#
+# tools/sheet.py import rewrites this from an edited sheet.
+BLUE     BLUE     NAVY
+NAVY     SILVER   NAVY
+SILVER   WHITE    NAVY
+WHITE    WHITE    BLUE
+CYAN     WHITE    SILVER

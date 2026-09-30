@@ -40,8 +40,7 @@ def rgb(i):
 NAVY = 11
 # Body tones, dark to light, then the glint. The art stores four neutral
 # tones so one sprite serves both sides through a remap:
-#   White: BLUE, SILVER, WHITE, WHITE   (NAVY->SILVER, SILVER->WHITE)
-#   Black: NAVY, NAVY,   NAVY,  BLUE    (BLUE->NAVY, SILVER->NAVY, WHITE->BLUE, CYAN->SILVER)
+#   (each side's colours for them: tools/art/sides.txt)
 BODY = [BLUE, NAVY, SILVER, WHITE, CYAN]
 TRIM = [WOOD, WOOD, GOLD, GOLD, WHITE]
 THRESH = [0.38, 0.62, 0.90]
@@ -369,8 +368,11 @@ def to_png(img):
     return im
 
 
-WHITE_REMAP = {NAVY: SILVER, SILVER: WHITE, CYAN: WHITE}
-BLACK_REMAP = {BLUE: NAVY, SILVER: NAVY, WHITE: BLUE, CYAN: SILVER}
+# Each side's colours: tools/art/sides.txt (read through assets.py).
+from assets import load_sides  # noqa: E402
+_SIDES = load_sides()
+WHITE_REMAP = {a: c for a, c in enumerate(_SIDES[0]) if a != c}
+BLACK_REMAP = {a: c for a, c in enumerate(_SIDES[1]) if a != c}
 
 
 def remap(img, table):
