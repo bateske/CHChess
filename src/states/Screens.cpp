@@ -623,6 +623,9 @@ static void optionsRender(uint32_t frame) {
 //   M <from> <to> [promo]                   play a move (squares 0..63)
 //   J <T|S|O>                               jump to title/setup/options
 //   X <fen>                                 (simulator) set up a position, two players
+//   V <fen>                                 (simulator) ... you, the side to move, against the CPU
+//   R <sq>                                  (simulator) the D-pad route to sq: ROUTE UDLR..
+//   H                                       (simulator) the board: BOARD <64 chars> <w|b> <your turn 0|1> <waiting on a press 0|1>
 static bool debugHook(char cmd, const char *args) {
     char buf[48], *p;
     switch (cmd) {
@@ -689,6 +692,51 @@ static bool debugHook(char cmd, const char *args) {
             dbg::print(buf);
             return true;
         }
+        case 'R': {
+            // R <sq>: the D-pad presses (U D L R) that take the glove to sq,
+            // as the cursor steps between its spots (fewest presses).
+            uint8_t list[32], n = spots(list), c = stage::cursor(), to = (uint8_t)dbg::parseNum(args, 10);
+            bool on = false;
+            for (uint8_t i = 0; i < n; i++) on |= list[i] == c;
+            if (!on && n) c = nearest(list, n, c, 0, 0);
+            static const int8_t DX[4] = {0, 0, -1, 1}, DY[4] = {-1, 1, 0, 0};
+            uint8_t from[64], how[64], q[64], qh = 0, qt = 0;
+            memset(from, 0xFF, sizeof from);
+            from[c] = c; q[qt++] = c;
+            while (qh < qt && from[to] == 0xFF) {
+                uint8_t sq = q[qh++];
+                for (uint8_t d = 0; d < 4; d++) {
+                    uint8_t t = nearest(list, n, sq, DX[d], DY[d]);
+                    if (t != 0xFF && from[t] == 0xFF) { from[t] = sq; how[t] = d; q[qt++] = t; }
+                }
+            }
+            char path[48];
+            uint8_t k = 0;
+            if (from[to] == 0xFF) path[k++] = '?';
+            else for (uint8_t sq = to; sq != c && k < 40; sq = from[sq]) path[k++] = "UDLR"[how[sq]];
+            p = fmtStr(buf, "ROUTE ");
+            while (k) *p++ = path[--k];
+            fmtStr(p, "\n");
+            dbg::print(buf);
+            return true;
+        }
+        case 'H': {
+            // H: the board (a1..h8, PNBRQK white, lower case black) and who moves.
+            static const char L[] = ".PNBRQK";
+            char b[80];
+            p = fmtStr(b, "BOARD ");
+            for (uint8_t sq = 0; sq < 64; sq++) {
+                uint8_t pc = match::board[sq];
+                char ch = L[pc & eng::TYPE];
+                *p++ = (pc & eng::BLACK) ? (char)(ch | 0x20) : ch;
+            }
+            *p++ = ' '; *p++ = match::blackToMove() ? 'b' : 'w';
+            *p++ = ' '; *p++ = match::humanToMove() && !stage::busy() && overlay == NONE ? '1' : '0';
+            *p++ = ' '; *p++ = stage::waiting() ? '1' : '0';
+            fmtStr(p, "\n");
+            dbg::print(b);
+            return true;
+        }
         case 'V':
         case 'X': {
             // X <fen>: two players from a position; V <fen>: you, the side to
@@ -709,7 +757,7 @@ static bool debugHook(char cmd, const char *args) {
 // arrives when it is the human's turn, as a press would); the render
 // profile and the think report never touch the game, so they run at once.
 static bool searching(char cmd) {
-    if (cmd == 'Y' || cmd == 'W') return false;
+    if (cmd == 'Y' || cmd == 'W' || cmd == 'R' || cmd == 'H') return false;
     if (stage::waiting()) stage::acknowledge();           // a scripted command answers CHECK! as a press would
     return match::cpuThinking() || (cur == Scr::Play && match::active() && !match::humanToMove());
 }

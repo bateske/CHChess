@@ -11,6 +11,11 @@ captured pieces knocked off the board tumbling, CHECK! and CHECKMATE! in
 Blackjack's dancing gradient letters, and a CPU opponent whose red glove
 hovers over the pieces it is thinking about.
 
+A whole game against BEGINNER, from the title screen (two minutes,
+`tools/scripts/gameplay.txt`):
+
+![gameplay](docs/gameplay.gif)
+
 | The CPU's turn | Capture | Checkmate |
 |---|---|---|
 | ![cpu](docs/cpu.gif) | ![capture](docs/capture.gif) | ![mate](docs/mate.gif) |
@@ -126,7 +131,9 @@ C++ compiler (zig, clang++ or g++ on the PATH, `pip install ziglang`, or
   level, and ~100,000 moves of fuzzed games through the game logic with undo
   and save/load.
 * `python tools/chsim/chdrive.py --sim . tools/scripts/showcase.txt docs/` -
-  runs the game from a script and writes the GIFs above. `say X <fen>` sets
+  runs the game from a script and writes the GIFs above (`gameplay.txt`,
+  the whole game: `goto` walks the glove to a square with D-pad presses,
+  `waitturn` waits for your move, `rec` records across a script). `say X <fen>` sets
   up a position, `say M <from> <to>` plays a move (squares 0 = a1 .. 63 = h8).
   `cal` and `perf` in a script estimate the device's render time.
 * `python tools/device.py upload [--debug]` - build and upload (`--debug`

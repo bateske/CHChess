@@ -1,0 +1,202 @@
+# A whole game against BEGINNER, from the title screen, played with the
+# buttons (goto walks the glove there with D-pad presses; the simulator
+# plans the route), recorded to gameplay.gif (docs/gameplay.gif):
+#
+#   python tools/chsim/chdrive.py --sim . tools/scripts/gameplay.txt docs/
+#
+# 1.e4 b6 2.Nf3 a5 3.Bc4 Nh6 4.O-O a4 5.d4 (on the map) e6 6.Bxh6 gxh6
+# 7.Ne5 Bd6 8.Qh5 Qf6 9.Nc3 Bc5 10.dxc5 Nc6 11.Nxc6 dxc6 12.cxb6 Qd4
+# 13.b7 Bxb7 14.Bxe6 c5 15.Qxf7+ Kd8 16.Rfd1 Qxd1+ 17.Rxd1+ Bd5 18.Rxd5#
+#
+# The CPU's replies follow from the game's seed, which the timing of the
+# title and setup presses sets: change nothing before 1.e4.
+rec start 3
+wait 150
+tap A
+wait 45
+tap UP
+wait 12
+tap UP
+wait 30
+tap RIGHT
+wait 30
+tap RIGHT
+wait 30
+tap RIGHT
+wait 30
+tap RIGHT
+wait 30
+tap RIGHT
+wait 30
+tap DOWN
+wait 20
+tap DOWN
+wait 25
+tap A
+wait 70
+# 1. e4: a piece that can't move first, then the pawn; B held to look around.
+goto 5 10
+wait 20
+tap A
+wait 40
+goto 12 10
+wait 10
+tap A
+wait 30
+hold B
+wait 45
+hold B+UP
+wait 50
+hold B+LEFT
+wait 50
+hold B
+wait 15
+release
+wait 40
+goto 28 10
+wait 10
+tap A
+waitturn 20
+goto 6 10
+wait 10
+tap A
+wait 25
+goto 21 10
+wait 10
+tap A
+waitturn 20
+goto 5 10
+wait 10
+tap A
+wait 25
+goto 26 10
+wait 10
+tap A
+waitturn 20
+goto 4 10
+wait 10
+tap A
+wait 25
+goto 6 10
+wait 10
+tap A
+waitturn 20
+tap SELECT
+wait 40
+goto 11 10
+wait 10
+tap A
+wait 25
+goto 27 10
+wait 10
+tap A
+waitturn 20
+tap SELECT
+wait 40
+goto 2 10
+wait 10
+tap A
+wait 25
+goto 47 10
+wait 10
+tap A
+waitturn 20
+goto 21 10
+wait 10
+tap A
+wait 25
+goto 36 10
+wait 10
+tap A
+waitturn 20
+goto 3 10
+wait 10
+tap A
+wait 25
+goto 39 10
+wait 10
+tap A
+waitturn 20
+goto 1 10
+wait 10
+tap A
+wait 25
+goto 18 10
+wait 10
+tap A
+waitturn 20
+goto 27 10
+wait 10
+tap A
+wait 25
+goto 34 10
+wait 10
+tap A
+waitturn 20
+goto 36 10
+wait 10
+tap A
+wait 25
+goto 42 10
+wait 10
+tap A
+waitturn 20
+goto 34 10
+wait 10
+tap A
+wait 25
+goto 41 10
+wait 10
+tap A
+waitturn 20
+goto 41 10
+wait 10
+tap A
+wait 25
+goto 49 10
+wait 10
+tap A
+waitturn 20
+goto 26 10
+wait 10
+tap A
+wait 25
+goto 44 10
+wait 10
+tap A
+waitturn 20
+goto 39 10
+wait 10
+tap A
+wait 25
+goto 53 10
+wait 10
+tap A
+waitturn 20
+goto 5 10
+wait 10
+tap A
+wait 25
+goto 3 10
+wait 10
+tap A
+waitturn 20
+goto 0 10
+wait 10
+tap A
+wait 25
+goto 3 10
+wait 10
+tap A
+waitturn 20
+goto 3 10
+wait 10
+tap A
+wait 25
+goto 35 10
+wait 10
+tap A
+wait 240
+tap A
+wait 150
+rec stop gameplay

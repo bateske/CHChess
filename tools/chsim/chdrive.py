@@ -12,6 +12,10 @@ Script lines (# comments allowed):
     wait N              advance N frames
     free SECONDS        run free (real time) for a while, then lockstep again
     freegif NAME SECONDS EVERY   the same, sampled into a GIF
+    goto SQ [W]         (simulator) walk the glove to square SQ with D-pad taps
+    board               (simulator) print the board
+    waitturn [W]        (simulator) run until it is your move, then W frames more
+    rec start [EVERY] / rec stop NAME   record everything in between to NAME.gif
     tap BTN[+BTN] [H]   hold for H frames (default 3), then release, then 1 frame
     hold BTN[+BTN]      keep held until `release`
     release
@@ -149,8 +153,31 @@ class Driver:
         raise RuntimeError("device never answered '?'")
 
     def frames(self, n):
-        if n > 0:
-            self.cmd(f"N {n}")
+        rec = getattr(self, "rec", None)
+        if rec is None:
+            if n > 0:
+                self.cmd(f"N {n}")
+            return
+        # Recording: a frame at a time, keeping every rec_every-th.
+        for _ in range(n):
+            self.cmd("N 1")
+            self.rec_count += 1
+            if self.rec_count % self.rec_every == 0:
+                rec.append(self.shot())
+
+    def query(self, line, prefix):
+        """Send a game command and return its reply line starting with prefix."""
+        self.t.send(line)
+        got = None
+        for _ in range(100):
+            reply = self.t.readline()
+            if reply.startswith(prefix):
+                got = reply.strip()
+            elif reply.startswith("OK"):
+                return got
+            elif reply.startswith(("ERR", "HELD")):
+                raise SystemExit(f"game refused: {line}")
+        raise RuntimeError(f"no reply to {line}")
 
     def buttons(self, mask):
         self.cmd(f"K {mask:x}")
@@ -222,6 +249,48 @@ class Driver:
                 self.cmd("L0")
                 time.sleep(float(args[0]))
                 self.cmd("L1")
+            elif op == "goto":
+                # Walk the glove to square N with D-pad presses (simulator: the
+                # game plans the route), W frames apart (default 8).
+                route = self.query(f"R {args[0]}", "ROUTE").split()[1:]
+                steps = route[0] if route else ""
+                if "?" in steps:
+                    raise SystemExit(f"no route to {args[0]}")
+                gap = int(args[1]) if len(args) > 1 else 8
+                for ch in steps:
+                    self.buttons(mask_of({"U": "UP", "D": "DOWN", "L": "LEFT", "R": "RIGHT"}[ch]))
+                    self.frames(3)
+                    self.buttons(0)
+                    self.frames(gap)
+            elif op == "waitturn":
+                # (simulator) until the game waits for your move, then W more
+                # frames. CHECK! against you is answered with A after 90 frames.
+                waited = 0
+                for _ in range(5000):
+                    state = self.query("H", "BOARD").split()
+                    if state[3] == "1":
+                        break
+                    waited = waited + 1 if state[4] == "1" else 0
+                    if waited > 90:
+                        self.buttons(mask_of("A"))
+                        self.frames(3)
+                        self.buttons(0)
+                    self.frames(1)
+                self.frames(int(args[0]) if args else 0)
+            elif op == "board":
+                print(self.query("H", "BOARD"), flush=True)
+            elif op == "rec":
+                # rec start [EVERY]: record from here (every EVERY-th frame, 3);
+                # rec stop NAME: write NAME.gif.
+                if args[0] == "start":
+                    self.rec, self.rec_count = [], 0
+                    self.rec_every = int(args[1]) if len(args) > 1 else 3
+                else:
+                    shots, self.rec = self.rec, None
+                    frames = [to_image(d, 2) for d in shots]
+                    frames[0].save(outdir / f"{args[1]}.gif", save_all=True, append_images=frames[1:],
+                                   duration=int(1000 * self.rec_every / 60), loop=0)
+                    print(f"{args[1]}.gif: {len(frames)} frames", flush=True)
             elif op == "freegif":
                 # Free-running (real time, as on the board: the CPU thinks in
                 # bursts) for SECONDS, a shot every EVERY seconds into a GIF.
