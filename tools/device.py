@@ -1,4 +1,4 @@
-"""Build, upload and drive CHBlackjack on the attached CHGame.
+"""Build, upload and drive CHChess on the attached CHGame.
 
     python tools/device.py build [--debug]         compile (release by default)
     python tools/device.py upload [--debug]        compile + upload
@@ -20,13 +20,17 @@ HERE = Path(__file__).resolve().parent
 SKETCH = HERE.parent
 CHSIM = HERE / "chsim"
 FQBN = "CHGame:ch32v:CHGame:opt=osstd,rtlib=nano,periph=game"
+# CHChess needs link-time optimisation to fit. Board packages with the
+# "Smallest + LTO" Optimize option (opt=oslto) do it from the menu; this flag
+# does the same on any CHGame package (0.2.2 has no such option).
+LTO = "-flto"
 
 
 def build(debug):
     out = SKETCH / "build" / ("debug" if debug else "release")
     cmd = ["arduino-cli", "compile", "-b", FQBN, "--build-path", str(out)]
-    if debug:
-        cmd += ["--build-property", "build.extra_flags=-DCHCH_DEBUG=1"]
+    flags = LTO + (" -DCHCH_DEBUG=1" if debug else "")
+    cmd += ["--build-property", f"build.extra_flags={flags}"]
     cmd.append(str(SKETCH))
     r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode:

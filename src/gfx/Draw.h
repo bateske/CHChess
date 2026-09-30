@@ -19,7 +19,7 @@ void blit4(const uint8_t *spr, int x, int y, uint8_t w, uint8_t h, int8_t trans,
 void span4(const uint8_t *data, int x, int y, int8_t trans, const uint8_t *remap = nullptr);
 // span4 art (colour 15 = skip) with a remap, mirrored left-right and/or
 // ghosted (every other pixel, checkerboard) - pieces in front of the cursor.
-enum : uint8_t { SPR_MIRROR = 1, SPR_GHOST = 2 };
+enum : uint8_t { SPR_MIRROR = 1, SPR_GHOST = 2, SPR_2X = 4 };
 void sprite4(const uint8_t *data, int x, int y, const uint8_t *remap, uint8_t flags);
 // span4 art turned by `angle` (256 = one turn) and scaled (256 = 1:1) about
 // its pixel (ax, ay), which lands on screen (px, py). Decodes into the CHGfx

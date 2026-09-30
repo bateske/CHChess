@@ -101,25 +101,30 @@ RAMFUNC(sprite4) void sprite4(const uint8_t *d, int x, int y, const uint8_t *rem
     uint8_t w = d[0], h = d[1];
     d += 2;
     bool mirror = flags & SPR_MIRROR, ghost = flags & SPR_GHOST;
-    for (int j = 0; j < h; j++, y++) {
+    int s = (flags & SPR_2X) ? 2 : 1;           // doubled: every pixel a 2x2 block
+    for (int j = 0; j < h; j++) {
         uint8_t n = *d++;
-        if ((unsigned)y >= GFX_H) { d += n; continue; }
-        uint8_t *row = gfx_fb + y * GFX_FB_STRIDE;
-        int px = 0;
-        while (n--) {
-            uint8_t b = *d++;
-            int len = (b >> 4) + 1;
-            uint8_t c = b & 15;
-            if (c != 15) {
-                c = remap[c];
-                int a = mirror ? x + w - px - len : x + px;
-                if (!ghost) fillRun(row, a, len, c);
-                else {
-                    for (int k = a + ((a + y) & 1); k < a + len; k += 2)
-                        if ((unsigned)k < GFX_W) plot(row + (k >> 1), k, c);
+        const uint8_t *runs = d;
+        d += n;
+        for (int rep = 0; rep < s; rep++, y++) {
+            if ((unsigned)y >= GFX_H) continue;
+            uint8_t *row = gfx_fb + y * GFX_FB_STRIDE;
+            int px = 0;
+            for (uint8_t i = 0; i < n; i++) {
+                uint8_t b = runs[i];
+                int len = (b >> 4) + 1;
+                uint8_t c = b & 15;
+                if (c != 15) {
+                    c = remap[c];
+                    int a = mirror ? x + (w - px - len) * s : x + px * s;
+                    if (!ghost) fillRun(row, a, len * s, c);
+                    else {
+                        for (int k = a + ((a + y) & 1); k < a + len * s; k += 2)
+                            if ((unsigned)k < GFX_W) plot(row + (k >> 1), k, c);
+                    }
                 }
+                px += len;
             }
-            px += len;
         }
     }
 }

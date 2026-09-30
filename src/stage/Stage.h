@@ -27,8 +27,13 @@ void select(uint8_t sq, const uint8_t *to, const uint8_t *cap, uint8_t n);
 void deselect();
 uint8_t selected();                  // 0xFF: none
 void deny(uint8_t sq);               // the piece shakes its head
-bool strategy();
-void setStrategy(bool on);
+// Views: the iso board (20x10 tiles), a 2x close-up, and the flat map.
+enum View : uint8_t { NORMAL, CLOSE, MAP, VIEWS };
+uint8_t view();
+void setView(uint8_t v);
+// The look-around spring (B + direction): -1/0/1 per axis in screen space;
+// 0, 0 lets the camera spring back.
+void spring(int dx, int dy);
 void setHints(bool on);              // show the legal moves of a selected piece
 void setCoords(bool on);             // file/rank letters on the rim
 void setFast(bool on);               // quicker CPU turns and moves

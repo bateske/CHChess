@@ -19,12 +19,11 @@
 #include "../debug/Debug.h"
 #ifdef CHSIM
 #include <sim.h>
-namespace stage { extern uint64_t simLap[8]; }
 #endif
 
 namespace screens {
 
-enum class Scr : uint8_t { Title, Setup, Play, Options, Stats };
+enum class Scr : uint8_t { Title, Setup, Play, Options };
 static Scr cur = Scr::Title, pending = Scr::Title;
 static uint16_t t;                   // frames on this screen
 static uint8_t fadeOut, fadeIn;
@@ -65,14 +64,19 @@ static void enter(Scr s) {
     fx::clear();
     pal::setMode(pal::CASINO);
     if (s == Scr::Title) {
-        // The board behind the title: a fresh game, the camera drifting over it.
+        // The board behind the title: a fresh game, close up, the camera
+        // drifting over it.
         match::Setup demo = {match::TWO_PLAYER, 0, 0, 1};
         match::start(demo);
         stage::update(false);
+        stage::setView(stage::CLOSE);
         audio::sfx(Sfx::Title);
     }
     if (s == Scr::Setup) sel = 2;
-    if (s == Scr::Play) stage::opponentName = OPPONENT[match::setup.level];
+    if (s == Scr::Play) {
+        stage::opponentName = OPPONENT[match::setup.level];
+        stage::setView(stage::NORMAL);
+    }
 }
 
 static void persist(bool withGame) {
@@ -135,8 +139,8 @@ static uint32_t seedNow() { return micros() * 2654435761u ^ arduboy.frameCount; 
 // ---------------------------------------------------------------------------
 // Title: the board in its starting position, the camera drifting over it.
 // ---------------------------------------------------------------------------
-enum Item : uint8_t { I_ONE, I_TWO, I_CONTINUE, I_OPTIONS, I_STATS };
-static const char *const ITEM[5] = {"1 PLAYER", "2 PLAYERS", "CONTINUE", "OPTIONS", "STATS"};
+enum Item : uint8_t { I_ONE, I_TWO, I_CONTINUE, I_OPTIONS };
+static const char *const ITEM[4] = {"1 PLAYER", "2 PLAYERS", "CONTINUE", "OPTIONS"};
 
 static uint8_t titleItems(uint8_t *items) {
     uint8_t n = 0;
@@ -144,7 +148,6 @@ static uint8_t titleItems(uint8_t *items) {
     items[n++] = I_ONE;
     items[n++] = I_TWO;
     items[n++] = I_OPTIONS;
-    items[n++] = I_STATS;
     return n;
 }
 
@@ -173,14 +176,14 @@ static void titleUpdate() {
                 else { hasGame = false; audio::sfx(Sfx::Deny); }
                 break;
             case I_OPTIONS: optBack = Scr::Title; go(Scr::Options); break;
-            case I_STATS: go(Scr::Stats); break;
         }
     }
-    // Drift over the board: along White's army, round to Black's and back.
+    // Drift over the board, close up: along White's army, round to Black's
+    // and back.
     int a = (int)t / 3;
     iso::cam.flip = false;
-    iso::cam.x = (fx::isin(a) * 150) >> 8;
-    iso::cam.y = 118 + ((fx::isin(a * 2 + 64) * 60) >> 8);
+    iso::cam.x = (fx::isin(a) * 110) >> 8;
+    iso::cam.y = 86 + ((fx::isin(a * 2 + 64) * 44) >> 8);
 }
 
 static void titleRender(uint32_t frame) {
@@ -204,6 +207,14 @@ static void setupUpdate() {
     if (arduboy.repeat(DOWN_BUTTON) && sel < 2) { sel++; audio::sfx(Sfx::Cursor); }
     if (d && sel == 0) { opt.level = (uint8_t)((opt.level + match::LEVELS + d) % match::LEVELS); audio::sfx(Sfx::Coin); }
     if (d && sel == 1) { opt.side = (uint8_t)((opt.side + 3 + d) % 3); audio::sfx(Sfx::Coin); }
+    // Hold SELECT to wipe your record against this opponent.
+    static uint8_t hold;
+    hold = arduboy.pressed(SELECT_BUTTON) ? (uint8_t)(hold + 1) : 0;
+    if (hold == 90) {
+        stats.won[opt.level] = stats.lost[opt.level] = stats.drawn[opt.level] = 0;
+        persist(hasGame);
+        audio::sfx(Sfx::Capture);
+    }
     if (arduboy.justPressed(A_BUTTON)) {
         if (sel < 2) { sel++; audio::sfx(Sfx::Cursor); }
         else { audio::sfx(Sfx::Select); persist(hasGame); newGame(match::VS_CPU); }
@@ -228,6 +239,12 @@ static void setupRender(uint32_t frame) {
     centred2(51, OPPONENT[opt.level], sel == 0 ? GOLD : WHITE);
     arrows(53, w, sel == 0, frame);
     centred35(66, OPP_LINE[opt.level], FELT_LT);
+    // Your record against them.
+    char buf[24], *p = fmtStr(buf, "WON ");
+    p = fmtInt(p, stats.won[opt.level]); p = fmtStr(p, " LOST ");
+    p = fmtInt(p, stats.lost[opt.level]); p = fmtStr(p, " DRAWN ");
+    fmtInt(p, stats.drawn[opt.level]);
+    centred35(72, buf, GOLD);
 
     static const char *const SIDE[3] = {"PLAY WHITE", "PLAY BLACK", "RANDOM SIDE"};
     w = text35x2Width(SIDE[opt.side]);
@@ -245,23 +262,6 @@ static bool ownPiece(uint8_t sq) {
     return p && ((p & eng::BLACK) != 0) == match::blackToMove();
 }
 
-// B + direction: jump to the next of your pieces that can move.
-static void cycle(int dir) {
-    uint8_t to[32], cap[32];
-    int u0, v0;
-    iso::toView(stage::cursor(), stage::flipped(), u0, v0);
-    int start = v0 * 8 + u0;
-    for (int k = 1; k <= 64; k++) {
-        int i = (start + dir * k + 128) & 63;
-        uint8_t sq = iso::fromView(i & 7, i >> 3, stage::flipped());
-        if (ownPiece(sq) && match::movesFrom(sq, to, cap)) {
-            stage::setCursor(sq);
-            audio::sfx(Sfx::Cursor);
-            return;
-        }
-    }
-}
-
 static void tryTarget(uint8_t sq) {
     uint8_t from = stage::selected();
     if (match::needsPromotion(from, sq)) {
@@ -273,20 +273,37 @@ static void tryTarget(uint8_t sq) {
     if (match::play(from, sq)) stage::deselect();
 }
 
+// B + direction springs the camera that way to look around; letting go of
+// either springs it back. A tap of B on its own puts a piece back down.
+static bool bUsed;
+static void lookAround() {
+    if (arduboy.justPressed(B_BUTTON)) bUsed = false;
+    int dx = 0, dy = 0;
+    if (arduboy.pressed(B_BUTTON)) {
+        if (arduboy.pressed(LEFT_BUTTON)) dx = -1;
+        if (arduboy.pressed(RIGHT_BUTTON)) dx = 1;
+        if (arduboy.pressed(UP_BUTTON)) dy = -1;
+        if (arduboy.pressed(DOWN_BUTTON)) dy = 1;
+        if (dx || dy) bUsed = true;
+    }
+    stage::spring(dx, dy);
+}
+
+static void cycleView() {
+    stage::setView((uint8_t)((stage::view() + 1) % stage::VIEWS));
+    audio::sfx(Sfx::Whoosh);
+}
+
 static void playInput() {
     uint8_t c = stage::cursor();
-    bool held = arduboy.pressed(B_BUTTON);
-    static bool bUsed;
-    if (arduboy.justPressed(B_BUTTON)) bUsed = false;
     int du = 0, dv = 0;
-    if (arduboy.repeat(UP_BUTTON)) dv = -1;
-    if (arduboy.repeat(DOWN_BUTTON)) dv = 1;
-    if (arduboy.repeat(LEFT_BUTTON)) du = -1;
-    if (arduboy.repeat(RIGHT_BUTTON)) du = 1;
-    if (du || dv) {
-        if (held) { cycle(du + dv > 0 ? 1 : -1); bUsed = true; }
-        else stage::moveCursor(du, dv);
+    if (!arduboy.pressed(B_BUTTON)) {
+        if (arduboy.repeat(UP_BUTTON)) dv = -1;
+        if (arduboy.repeat(DOWN_BUTTON)) dv = 1;
+        if (arduboy.repeat(LEFT_BUTTON)) du = -1;
+        if (arduboy.repeat(RIGHT_BUTTON)) du = 1;
     }
+    if (du || dv) stage::moveCursor(du, dv);
     if (arduboy.justReleased(B_BUTTON) && !bUsed && stage::selected() != 0xFF) {
         stage::deselect();
         audio::sfx(Sfx::Cursor);
@@ -321,7 +338,7 @@ static void promoInput() {
 }
 
 enum Action : uint8_t { A_NONE, A_RESUME, A_UNDO, A_RESIGN, A_QUIT };
-static const char *const PAUSE_ITEM[4] = {"RESUME", "UNDO", "RESIGN", "SAVE & QUIT"};
+static const char *const PAUSE_ITEM[4] = {"RESUME", "UNDO", "RESIGN", "SAVE + QUIT"};
 
 static void doAction(uint8_t a) {
     switch (a) {
@@ -368,7 +385,8 @@ static void playUpdate(bool thinking) {
         // Mid-search: the pause menu and the view toggle work; the game waits.
         if (overlay == PAUSE) pauseInput(true);
         else if (arduboy.justPressed(START_BUTTON)) { overlay = PAUSE; sel = 0; audio::sfx(Sfx::Select); }
-        if (arduboy.justPressed(SELECT_BUTTON)) { stage::setStrategy(!stage::strategy()); audio::sfx(Sfx::Whoosh); }
+        if (overlay == NONE) lookAround();
+        if (arduboy.justPressed(SELECT_BUTTON)) cycleView();
         stage::update(true);
         return;
     }
@@ -389,7 +407,8 @@ static void playUpdate(bool thinking) {
             break;
         default:
             if (arduboy.justPressed(START_BUTTON)) { overlay = PAUSE; sel = 0; audio::sfx(Sfx::Select); break; }
-            if (arduboy.justPressed(SELECT_BUTTON)) { stage::setStrategy(!stage::strategy()); audio::sfx(Sfx::Whoosh); }
+            if (arduboy.justPressed(SELECT_BUTTON)) cycleView();
+            lookAround();
             if (match::humanToMove() && !stage::busy()) playInput();
             break;
     }
@@ -494,9 +513,9 @@ static void optionsUpdate() {
 
 static void optionsRender(uint32_t frame) {
     feltBackdrop();
-    title35("OPTIONS", 8, 3, FX_B, GOLD, WOOD, WINE, 13);
+    title35("OPTIONS", 7, 3, FX_B, GOLD, WOOD, WINE, 13);
     for (uint8_t i = 0; i < OPT_COUNT; i++) {
-        int y = 32 + i * 15;
+        int y = 29 + i * 13;
         char label[12], value[12];
         optField(OPT_TEXT[i], 0, label);
         if (i == sel) {
@@ -508,46 +527,10 @@ static void optionsRender(uint32_t frame) {
         optField(OPT_TEXT[i], (uint8_t)(((uint8_t *)&opt)[i] + 1), value);
         text35x2(114 - text35x2Width(value), y, value, i == sel ? WHITE : FELT_LT);
     }
-}
-
-// ---------------------------------------------------------------------------
-// Stats and credits (hold SELECT to reset the stats)
-// ---------------------------------------------------------------------------
-static void statsUpdate() {
-    static uint8_t hold;
-    hold = arduboy.pressed(SELECT_BUTTON) ? (uint8_t)(hold + 1) : 0;
-    if (hold == 90) {
-        memset(&stats, 0, sizeof stats);
-        persist(hasGame);
-        audio::sfx(Sfx::Capture);
-        fx::shake(10, 2);
-    }
-    if (arduboy.justPressed(A_BUTTON | B_BUTTON)) { audio::sfx(Sfx::Select); go(Scr::Title); }
-}
-
-static void statsRender(uint32_t frame) {
-    (void)frame;
-    feltBackdrop();
-    title35("STATS", 8, 3, WHITE, CYAN, BLUE, NAVY, 13);
-    text35(66, 31, "WON LOST DRAW", GOLD);
-    for (int i = 0; i < match::LEVELS; i++) {
-        int y = 40 + i * 10;
-        text35(10, y, OPPONENT[i], WHITE);
-        uint16_t v[3] = {stats.won[i], stats.lost[i], stats.drawn[i]};
-        for (int k = 0; k < 3; k++) {
-            char buf[8];
-            fmtInt(buf, v[k]);
-            text35(78 + k * 17 - text35Width(buf), y, buf, k == 0 ? FX_B : SILVER);
-        }
-    }
-    centred35(91, "HOLD SELECT TO RESET", FELT_LT);
     // Credits.
-    centred35(102, "CHESS ENGINE: ARDUCHESS", GOLD);
-    centred35(109, "BY PETER BROWN (MPL-2.0)", SILVER);
-    centred35(116, "FONT: PRESS PLAY ON TAPE", SILVER);
-    fx::applyShake(0, 127);
+    centred35(110, "ARDUCHESS ENGINE: PETER BROWN", SILVER);
+    centred35(117, "FONT: PRESS PLAY ON TAPE", SILVER);
 }
-
 
 // ---------------------------------------------------------------------------
 // Debug protocol hooks (tools/chsim/chdrive.py 'say')
@@ -555,7 +538,7 @@ static void statsRender(uint32_t frame) {
 #if CHCH_DEBUG
 //   G <mode> <humanBlack> <level> <seed>   start a game (mode 0 vs CPU, 1 two players)
 //   M <from> <to> [promo]                   play a move (squares 0..63)
-//   J <T|S|O|A>                             jump to title/setup/options/stats
+//   J <T|S|O>                               jump to title/setup/options
 //   X <fen>                                 (simulator) set up a position, two players
 static bool debugHook(char cmd, const char *args) {
     switch (cmd) {
@@ -576,10 +559,10 @@ static bool debugHook(char cmd, const char *args) {
             return match::play(f, to, p ? p : eng::QUEEN);
         }
         case 'J': {
-            static const char K[] = "TSOA";
+            static const char K[] = "TSO";
             const char *q = strchr(K, args[0]);
             if (!q) return false;
-            static const Scr S[] = {Scr::Title, Scr::Setup, Scr::Options, Scr::Stats};
+            static const Scr S[] = {Scr::Title, Scr::Setup, Scr::Options};
             enter(S[q - K]);
             return true;
         }
@@ -598,14 +581,6 @@ static bool debugHook(char cmd, const char *args) {
             t0 = sim_hostNanos(); for (int i = 0; i < 1000; i++) gfx_fillCircle(64, 64, 30, (uint8_t)i); r[4] = (sim_hostNanos() - t0) / 1000;
             char buf[96], *p = fmtStr(buf, "CAL");
             for (int k = 0; k < 5; k++) { *p++ = ' '; p = fmtInt(p, (int32_t)r[k]); }
-            fmtStr(p, "\n");
-            dbg::print(buf);
-            return true;
-        }
-        case 'Y': {
-            // Section times of stage::render so far (host ns), then reset.
-            char buf[96], *p = fmtStr(buf, "LAPS");
-            for (int k = 0; k < 7; k++) { *p++ = ' '; p = fmtInt(p, (int32_t)(stage::simLap[k] / 1000)); stage::simLap[k] = 0; }
             fmtStr(p, "\n");
             dbg::print(buf);
             return true;
@@ -656,7 +631,6 @@ void update(bool thinking) {
         case Scr::Setup:   setupUpdate(); break;
         case Scr::Play:    playUpdate(false); break;
         case Scr::Options: optionsUpdate(); break;
-        case Scr::Stats:   statsUpdate(); break;
     }
     fx::update();
 }
@@ -669,7 +643,6 @@ void render(uint32_t frame, bool thinking) {
         case Scr::Setup:   setupRender(frame); break;
         case Scr::Play:    playRender(frame); break;
         case Scr::Options: optionsRender(frame); break;
-        case Scr::Stats:   statsRender(frame); break;
     }
 }
 

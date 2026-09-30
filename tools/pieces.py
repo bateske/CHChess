@@ -158,9 +158,9 @@ def base_profile(R):
 
 def pawn():
     R = 10.0
-    prof = base_profile(R) + [(5.8, 7.2), (6.8, 7.4), (7.8, 6.2), (8.6, 5.0), (14.0, 3.6),
-                              (14.6, 5.6), (15.8, 5.8), (16.6, 4.0), (17.4, 3.4)]
-    shape = union(lathe(prof), sphere(0, 0, 22.2, 5.9))
+    prof = base_profile(R) + [(5.8, 7.2), (6.8, 7.4), (7.8, 6.2), (8.6, 5.0), (13.0, 3.8),
+                              (13.6, 6.0), (14.8, 6.2), (15.6, 4.2), (16.4, 3.6)]
+    shape = union(lathe(prof), sphere(0, 0, 21.6, 7.0))      # a big head: it reads at 13 px
     gold = lambda p: (p[:, 2] > 14.4) & (p[:, 2] < 16.8)
     return shape, gold, 28
 
@@ -251,15 +251,17 @@ PIECES = {"pawn": pawn, "knight": knight, "bishop": bishop, "rook": rook, "queen
 # ---------------------------------------------------------------------------
 # Rendering
 # ---------------------------------------------------------------------------
-def render(shape, gold, height, ss=4):
-    rmax = 12
+def render(shape, gold, height, size=1.0, ss=8):
+    """size: screen pixels per model unit (the models are built for 56 px tiles)."""
+    rmax = int(math.ceil(12 * size))
     w = 2 * rmax + 3
-    top = int(math.ceil(height * math.cos(ELEV) + 0.5 * rmax)) + 3
-    bot = int(math.ceil(0.5 * rmax)) + 2
+    top = int(math.ceil((height * math.cos(ELEV) + 6) * size)) + 3
+    bot = int(math.ceil(6 * size)) + 2
     h = top + bot
-    # Sub-pixel sample grid (centres), screen coords relative to the anchor.
-    xs = (np.arange(w * ss) + 0.5) / ss - w / 2
-    ys = (np.arange(h * ss) + 0.5) / ss - top          # down positive
+    # Sub-pixel sample grid (centres), screen coords relative to the anchor,
+    # in model units.
+    xs = ((np.arange(w * ss) + 0.5) / ss - w / 2) / size
+    ys = ((np.arange(h * ss) + 0.5) / ss - top) / size          # down positive
     X, Y = np.meshgrid(xs, ys)
     X = X.ravel(); Y = Y.ravel()
     origin = X[:, None] * R_AX[None, :] - Y[:, None] * U_AX[None, :] - D[None, :] * 80.0
@@ -325,7 +327,7 @@ def render(shape, gold, height, ss=4):
             img[y, x] = c
     # Despeckle: a lone pixel between two of the same body colour takes
     # theirs (cleaner bands, and fewer runs for the RLE packer).
-    for _ in range(2):
+    for _ in range(2 if size >= 1 else 1):
         for y in range(h):
             for x in range(1, w - 1):
                 a, b, c = img[y, x - 1], img[y, x], img[y, x + 1]
@@ -380,14 +382,15 @@ def remap(img, table):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--scale", type=int, default=6)
+    ap.add_argument("--size", type=float, default=0.5, help="pixels per model unit (1.0 = 56 px tiles)")
+    ap.add_argument("--scale", type=int, default=8, help="preview magnification")
     a = ap.parse_args()
     GEN.mkdir(parents=True, exist_ok=True)
     PREVIEW.mkdir(parents=True, exist_ok=True)
     tiles = []
     for name, fn in PIECES.items():
         shape, gold, height = fn()
-        img, anchor = render(shape, gold, height)
+        img, anchor = render(shape, gold, height, a.size)
         to_png(img).save(GEN / f"{name}.png")
         (GEN / f"{name}.anchor").write_text(f"{anchor[0]} {anchor[1]}\n")
         print(f"{name}: {img.shape[1]}x{img.shape[0]} anchor {anchor}")

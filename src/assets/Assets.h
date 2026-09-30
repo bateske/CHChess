@@ -5,4 +5,3 @@
 struct PieceArt { const uint8_t *data; int8_t ax, ay; };   // span4 art, base centre
 extern const PieceArt PIECE_ART[6];                          // pawn, knight, bishop, rook, queen, king
 extern const uint8_t HAND[];                                 // span4, fingertip at bottom centre
-extern const uint8_t *const ICON_ART[6];                    // 12x12 span4, WHITE fill, INK edge
