@@ -52,21 +52,25 @@ any CHGame package:
 | D-pad | move the glove between your pieces, or, holding one, between the squares it can go to | menus |
 | A | pick up the piece / put it down there | select |
 | B | put the piece back | back |
-| B + D-pad | look around: the camera springs that way until you let go | |
+| B held (+ D-pad) | inspect: the camera zooms right in; the D-pad pushes the view to the board's edges and corners until you let go | |
 | SELECT | change view: the board, or the map (from above) | |
 | START | pause: resume, undo, resign, save + quit | |
 
 The glove only stops on your own pieces (the one under it fades its outline
 black to white, the one you pick up gets a rainbow outline), or, holding
 one, on the squares it can go to (the one it is on blinks solid, a piece it
-would take is outlined red). Each press takes it to the nearest spot in
-that direction as the screen shows it (diagonals
-included, whatever the view); with nothing that way it wraps round to the
+would take flashes red). Each press takes it to the nearest spot in that
+direction as the screen shows it (diagonals included, whatever the view);
+with nothing that way it wraps round to the
 farthest spot the other way, so pressing on steps through them all. A plate
 at the foot of the screen names what it is on ("KNIGHT G1", "BISHOP F1 NO
 MOVES", "KNIGHT TO F3", "KNIGHT TAKES PAWN"), then calls out each move as
-it lands. During your
-turn the other side's last move is lit in gold. The camera leans towards
+it lands. During your turn the other side's last move is lit in gold.
+
+Check is an event: the king's square marches red, the king flashes red on
+a heartbeat, your glove turns red, the board's trim and the top bar go
+from gold to red, and the glove only stops on the pieces that can get you
+out of it. The camera leans towards
 the middle of the board, so the selection is always in view without empty
 carpet at the edges.
 
@@ -75,17 +79,17 @@ opponents:
 
 | Opponent | |
 |---|---|
-| ROOKIE | still learning the ropes: picks any move not much worse than the best |
-| REGULAR | plays it straight |
-| SHARK | smells weakness |
-| HIGH ROLLER | goes for broke: avoids draws |
-| THE HOUSE | the house always wins: its best move, every time |
+| BEGINNER | still learning the moves: picks any move not much worse than the best |
+| CLUB PLAYER | solid, but slips up |
+| EXPERT | punishes mistakes |
+| MASTER | plays to win, not draw |
+| GRANDMASTER | its best move, every time |
 
 The weaker opponents choose at random among moves within a margin of the
 best one, so they make human-looking mistakes rather than random blunders.
 Your record against each is on the opponent screen (hold SELECT there to
 clear it). Options: sound, board colour (green, blue, red, purple felt),
-move hints, coordinates, and the pace (QUICK: faster CPU turns and moves,
+move hints, coordinates, and the pace (FUN, or QUICK: faster CPU turns and moves,
 and no zooming in on them). Options, records and a game in
 progress (SAVE + QUIT, then CONTINUE) are saved to flash and survive
 re-uploading.
@@ -95,9 +99,10 @@ re-uploading.
 * **The engine** (ch2k, ~12 KB) is ArduChess's: a 0x88 board with fully
   legal move generation, alpha-beta with quiescence search, a Texel-tuned
   evaluation and an opening book, cut here to four plies. It runs
-  synchronously; every 8 nodes it calls back into the game, which keeps
-  the game running while it thinks (the CPU's glove, the camera, the
-  spinning chip), drawn at 20 fps so the search keeps most of the CPU.
+  synchronously; every 8 nodes it calls back into the game. The search
+  runs flat out, stopping every two seconds for a short burst of full-rate
+  frames in which the CPU's glove glides to the piece it is weighing (a
+  button press, or a menu, gets frames at once).
 * **The board** is drawn as 2:1 diamonds sampled at pixel centres, so every
   edge is a clean staircase at every zoom step (tiles 20x10 up to 40x20, a
   pixel at a time); pieces are span-encoded sprites rendered from 3D models

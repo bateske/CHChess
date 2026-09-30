@@ -33,9 +33,10 @@ enum View : uint8_t { NORMAL, MAP, VIEWS };
 uint8_t view();
 void setView(uint8_t v);
 void setZoom(uint8_t tileH);         // iso zoom now, 5..10 (the title's close-up)
-// The look-around spring (B + direction): -1/0/1 per axis in screen space;
-// 0, 0 lets the camera spring back.
-void spring(int dx, int dy);
+// Inspection (B held on the iso board): zoomed right in; dx, dy -1/0/1 in
+// screen space push the view to the board's edge or corner that way.
+void inspect(bool on, int dx, int dy);
+void thinkPick();                    // mid-search: the CPU's glove to the piece it is weighing
 void setHints(bool on);              // show the legal moves of a selected piece
 void setCoords(bool on);             // file/rank letters on the rim
 void setFast(bool on);               // quicker CPU turns and moves

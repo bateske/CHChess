@@ -13,7 +13,7 @@ Cam cam = {0, 40, false};
 uint8_t tileH = 5;
 bool flat;
 bool coords = true;
-uint8_t darkSq = FELT, lightSq = SKIN, tableCol = NAVY, tableDot = WINE, tableShadow = INK;
+uint8_t darkSq = FELT, lightSq = SKIN, tableCol = NAVY, tableDot = WINE, tableShadow = INK, trimCol = GOLD;
 
 void setView(bool m) { flat = m; }
 
@@ -235,12 +235,12 @@ static void rightFace(int xb, int yb, int depth, int shift, uint8_t c, uint8_t t
 
 static void label(int x, int y, char ch) {
     char s[2] = {ch, 0};
-    text35(x, y, s, GOLD);                      // clips per pixel
+    text35(x, y, s, trimCol);                   // clips per pixel
 }
 
 void drawBoard() {
     if (flat) {
-        gfx_rect(MX - 2, MY - 2, 8 * MW + 4, 8 * MH + 4, GOLD);
+        gfx_rect(MX - 2, MY - 2, 8 * MW + 4, 8 * MH + 4, trimCol);
         gfx_rect(MX - 1, MY - 1, 8 * MW + 2, 8 * MH + 2, INK);
         mapSquares(lightSq, darkSq);
         for (int i = 0; coords && i < 8; i++) {
@@ -257,8 +257,8 @@ void drawBoard() {
     // Contact shadow on the carpet, then the slab.
     leftFace(xl, yl, s + 2 + z, 1 + z, tableShadow, 0xFF);
     rightFace(xb, yb, s + 2 + z, 1 + z, tableShadow, 0xFF);
-    leftFace(xl, yl, s, 0, WINE, GOLD);
-    rightFace(xb, yb, s, 0, INK, GOLD);
+    leftFace(xl, yl, s, 0, WINE, trimCol);
+    rightFace(xb, yb, s, 0, INK, trimCol);
 
     isoSquares(xb, yl - 8 * hh(), hw(), 2 * hh(), lightSq, darkSq);
 

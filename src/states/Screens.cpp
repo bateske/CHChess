@@ -46,10 +46,10 @@ static bool statsCounted;
 static uint32_t thinkMs;            // the CPU's last search, wall time (debug W)
 #endif
 
-static const char *const OPPONENT[match::LEVELS] = {"ROOKIE", "REGULAR", "SHARK", "HIGH ROLLER", "THE HOUSE"};
+static const char *const OPPONENT[match::LEVELS] = {"BEGINNER", "CLUB PLAYER", "EXPERT", "MASTER", "GRANDMASTER"};
 static const char *const OPP_LINE[match::LEVELS] = {
-    "STILL LEARNING THE ROPES", "PLAYS IT STRAIGHT", "SMELLS WEAKNESS", "GOES FOR BROKE",
-    "THE HOUSE ALWAYS WINS"};
+    "STILL LEARNING THE MOVES", "SOLID, BUT SLIPS UP", "PUNISHES MISTAKES", "PLAYS TO WIN, NOT DRAW",
+    "ITS BEST MOVE, EVERY TIME"};
 
 // ---------------------------------------------------------------------------
 // Flow
@@ -201,7 +201,6 @@ static void titleRender(uint32_t frame) {
     dither(0, 0, 128, 34, INK, 0);
     // The top rows are FX_B, so the palette makes the logo shimmer.
     title35("CHESS", 4, 4, FX_B, GOLD, WOOD, WINE, 17);
-    centred35(29, "~CASINO~EDITION~", CYAN);
     uint8_t items[5], n = titleItems(items);
     int y0 = 128 - n * 14 - 1;
     dither(0, y0 - 5, 128, 128 - y0 + 5, INK, 1);
@@ -278,20 +277,23 @@ static void tryTarget(uint8_t sq) {
     if (match::play(from, sq)) stage::deselect();
 }
 
-// B + direction springs the camera that way to look around; letting go of
-// either springs it back. A tap of B on its own puts a piece back down.
+// A tap of B puts a piece back down. Held (or with a direction), it
+// inspects the board: the camera zooms right in and the D-pad pushes the
+// view to the board's edges and corners until B is let go.
 static bool bUsed;
+static uint8_t bHeld;
 static void lookAround() {
     if (arduboy.justPressed(B_BUTTON)) bUsed = false;
+    bHeld = arduboy.pressed(B_BUTTON) ? (uint8_t)(bHeld < 255 ? bHeld + 1 : 255) : 0;
     int dx = 0, dy = 0;
-    if (arduboy.pressed(B_BUTTON)) {
+    if (bHeld) {
         if (arduboy.pressed(LEFT_BUTTON)) dx = -1;
         if (arduboy.pressed(RIGHT_BUTTON)) dx = 1;
         if (arduboy.pressed(UP_BUTTON)) dy = -1;
         if (arduboy.pressed(DOWN_BUTTON)) dy = 1;
-        if (dx || dy) bUsed = true;
+        if (dx || dy || bHeld > 8) bUsed = true;
     }
-    stage::spring(dx, dy);
+    stage::inspect(bHeld && bUsed, dx, dy);
 }
 
 static void cycleView() {
@@ -299,11 +301,27 @@ static void cycleView() {
     audio::sfx(Sfx::Whoosh);
 }
 
-// The cursor visits your pieces (the plate says when one is stuck), or,
-// once one is picked up, the squares it can go to.
+// The cursor visits your pieces (the plate says when one is stuck) - in
+// check, only those that can get you out of it - or, once one is picked up,
+// the squares it can go to.
 static uint8_t spots(uint8_t *list) {
     uint8_t s = stage::selected(), cap[32], n = 0;
     if (s != 0xFF) return match::movesFrom(s, list, cap);
+    // In check, the pieces that can move - worked out once a position.
+    static uint32_t at;
+    static uint8_t can[16], nCan;
+    bool check = match::checkSq != 0xFF;
+    uint32_t key = (uint32_t)match::plies << 16 | match::lastFrom << 8 | match::lastTo;
+    if (check && key != at) {
+        uint8_t to[32];
+        at = key;
+        nCan = 0;
+        for (uint8_t sq = 0; sq < 64; sq++)
+            if (match::board[sq] && ((match::board[sq] & eng::BLACK) != 0) == match::blackToMove() &&
+                match::movesFrom(sq, to, cap))
+                can[nCan++] = sq;
+    }
+    if (check) { memcpy(list, can, nCan); return nCan; }
     for (uint8_t sq = 0; sq < 64; sq++) {
         uint8_t p = match::board[sq];
         if (p && ((p & eng::BLACK) != 0) == match::blackToMove()) list[n++] = sq;
@@ -362,7 +380,7 @@ static void playInput() {
     c = stage::cursor();
     uint8_t to[32], cap[32], k = s == 0xFF ? match::movesFrom(c, to, cap) : 1;
     stage::setBlocked(!k);
-    if (arduboy.justPressed(A_BUTTON)) {
+    if (arduboy.justPressed(A_BUTTON) && !bHeld) {
         if (s != 0xFF) tryTarget(c);
         else if (!k) audio::sfx(Sfx::Deny);
         else {
@@ -430,9 +448,9 @@ static void playUpdate(bool thinking) {
     if (thinking) {
         // Mid-search: the pause menu and the view toggle work; the game waits.
         if (overlay == PAUSE) pauseInput(true);
-        else if (arduboy.justPressed(START_BUTTON)) { overlay = PAUSE; sel = 0; audio::sfx(Sfx::Select); }
+        else if (arduboy.justPressed(START_BUTTON) && !bHeld) { overlay = PAUSE; sel = 0; audio::sfx(Sfx::Select); }
         if (overlay == NONE) lookAround();
-        if (arduboy.justPressed(SELECT_BUTTON)) cycleView();
+        if (arduboy.justPressed(SELECT_BUTTON) && !bHeld) cycleView();
         stage::update(true);
         return;
     }
@@ -452,9 +470,9 @@ static void playUpdate(bool thinking) {
             if (arduboy.justPressed(B_BUTTON)) { audio::sfx(Sfx::Select); persist(false); go(Scr::Title); }
             break;
         default:
-            if (arduboy.justPressed(START_BUTTON)) { overlay = PAUSE; sel = 0; audio::sfx(Sfx::Select); break; }
-            if (arduboy.justPressed(SELECT_BUTTON)) cycleView();
             lookAround();
+            if (arduboy.justPressed(START_BUTTON) && !bHeld) { overlay = PAUSE; sel = 0; audio::sfx(Sfx::Select); break; }
+            if (arduboy.justPressed(SELECT_BUTTON) && !bHeld) cycleView();
             if (match::humanToMove() && !stage::busy()) playInput();
             break;
     }
@@ -529,7 +547,7 @@ static void playRender(uint32_t frame) {
 #if !CHCH_LEAN
 enum Opt : uint8_t { O_SOUND, O_FELT, O_HINTS, O_COORDS, O_SPEED, O_BACK, OPT_COUNT };
 static const char *const OPT_TEXT[OPT_COUNT] = {
-    "SOUND|OFF|ON", "BOARD|GREEN|BLUE|RED|PURPLE", "HINTS|OFF|ON", "COORDS|OFF|ON", "PACE|SHOWY|QUICK",
+    "SOUND|OFF|ON", "BOARD|GREEN|BLUE|RED|PURPLE", "HINTS|OFF|ON", "COORDS|OFF|ON", "PACE|FUN|QUICK",
     "BACK",
 };
 
@@ -692,6 +710,8 @@ void begin() {
 #endif
     enter(Scr::Title);
 }
+
+bool holdFrames() { return cur == Scr::Play && (overlay != NONE || bHeld); }
 
 void update(bool thinking) {
     t++;

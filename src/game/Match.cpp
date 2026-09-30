@@ -6,14 +6,14 @@ namespace match {
 
 // Node budget, how far below the best a move may score and still be picked
 // (centipawns), contempt (16 cp units). Measured on the board: ~1,700
-// nodes/s alone, ~1,200 with the game running at 20 fps meanwhile, so these
-// think for about 0.3, 1, 2.5, 5 and 10 seconds.
+// nodes/s, with bursts of frames every 2 s, so these think for about 0.3,
+// 1, 2, 4 and 9 seconds.
 const eng::Level LEVEL[LEVELS] = {
-    {400, 150, 0},       // ROOKIE
-    {1200, 60, 0},       // REGULAR
-    {3000, 25, 0},       // SHARK
-    {6000, 10, 2},       // HIGH ROLLER: plays for the win
-    {12000, 0, 0},       // THE HOUSE
+    {400, 150, 0},       // BEGINNER
+    {1200, 60, 0},       // CLUB PLAYER
+    {3000, 25, 0},       // EXPERT
+    {6000, 10, 2},       // MASTER: plays for the win
+    {12000, 0, 0},       // GRANDMASTER
 };
 
 uint8_t board[64];
@@ -110,6 +110,8 @@ void start(const Setup &s) {
 }
 
 #ifdef CHSIM
+static bool judge();
+
 void startFen(const Setup &s, const char *fen) {
     start(s);
     eng::loadFen(fen);
@@ -118,6 +120,7 @@ void startFen(const Setup &s, const char *fen) {
     sync();
     qHead = qCount = 0;
     push(EV_START);
+    judge();                         // in check already?
 }
 #endif
 

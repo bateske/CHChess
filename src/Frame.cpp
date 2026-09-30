@@ -6,6 +6,7 @@
 #include "CHGame.h"
 #include "gfx/Palette.h"
 #include "states/Screens.h"
+#include "stage/Stage.h"
 #include "debug/Debug.h"
 #include "engine/Engine.h"
 #include "audio/Audio.h"
@@ -15,15 +16,22 @@
 
 namespace frame {
 
-// The engine calls back every 8 nodes (CH2K_POLL_NODES, ~5 ms on the
-// board), so a frame due mid-search starts at most that late.
+// While the CPU thinks, the search runs flat out - no frames at all - and
+// every SEARCH_MS stops for a BURST_MS burst of frames at the full rate: the
+// CPU's glove glides to the piece it is weighing (stage::thinkPick). On the
+// board a flush alone costs the search ~5 ms of CPU and a redraw ~8 more, so
+// short smooth bursts beat drawing thinly all along. A button starts a burst
+// at once, and a held one or an open menu keeps it going. The engine calls
+// back every 8 nodes (CH2K_POLL_NODES, ~5 ms), so that is prompt.
+static const uint16_t FIRST_MS = 300, SEARCH_MS = 2000, BURST_MS = 450;
+static uint32_t burstAt;
 // Lockstep (scripts, the simulator): one frame per two polls, i.e. per 16
 // nodes, so a scripted CPU move always takes the same frames.
 static const uint8_t POLLS_PER_FRAME = 2;
 #ifdef CHSIM
-// Free-running simulator: the board's search speed with the game drawn
-// meanwhile (~1,200 nodes/s, measured), so thinking takes as long as there.
-static const uint32_t SIM_US_PER_POLL = 8 * 830;
+// Free-running simulator: the board's search speed (~1,700 nodes/s,
+// measured), so thinking takes as long as there.
+static const uint32_t SIM_US_PER_POLL = 8 * 590;
 #endif
 
 // Frames drawn from inside the search run on a stack of their own: the
@@ -74,13 +82,6 @@ bool run(bool thinking) {
         audio::update();
         screens::update(thinking);
     } while (++ticks < 3 && arduboy.nextFrame());
-    // While the CPU thinks, draw and send every third tick (20 fps): on the
-    // board a flush alone takes ~5 ms of CPU from the search (the DMA and
-    // its chunk conversions) and a redraw ~8 more.
-    static uint8_t sinceDrawn;
-    sinceDrawn += ticks;
-    if (thinking && sinceDrawn < 3) return true;
-    sinceDrawn = 0;
     gfx_wait();
     pal::commit();
     dbg::markRenderStart();
@@ -114,7 +115,19 @@ static void thinkFrame() {
 #ifdef CHSIM
     sim_advance(SIM_US_PER_POLL);
 #endif
-    run(true);
+    uint32_t now = millis();
+    if (eng::nodes() <= 8) burstAt = now + FIRST_MS;        // a new search
+    if ((int32_t)(now - burstAt) < 0 && !(chgame_readButtons() | arduboy.injected)) return;
+    stage::thinkPick();
+    uint32_t end = now + BURST_MS;
+    while ((int32_t)(millis() - end) < 0 || (chgame_readButtons() | arduboy.injected) || screens::holdFrames()) {
+        if (!run(true)) {
+#ifdef CHSIM
+            sim_advance(1000);
+#endif
+        }
+    }
+    burstAt = millis() + SEARCH_MS;
 }
 
 }  // namespace frame

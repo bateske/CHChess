@@ -51,6 +51,7 @@ inline int toScreenY(int wy) { return flat ? wy : wy - cam.y + CY; }
 
 // Colours: squares, table, shadow.
 extern uint8_t darkSq, lightSq, tableCol, tableDot, tableShadow;
+extern uint8_t trimCol;                      // the rim's trim, the letters, the map's frame
 extern bool coords;                          // letters/numbers round the board
 
 void drawTable();                            // carpet, scrolled with the camera
