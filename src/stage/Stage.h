@@ -29,6 +29,7 @@ uint8_t selected();                  // 0xFF: none
 bool waiting();                      // CHECK! against the player, or CHECKMATE!, waiting for a button
 void acknowledge();                  // ... pressed
 void setBlocked(bool b);             // the piece under the glove has no move (the plate says so)
+void deny();                         // A on it anyway: the buzz, NO MOVES and the glove flash red
 // Views: the iso board and the flat map. The iso camera whips in close on
 // each move (not at QUICK pace) and pulls back out.
 enum View : uint8_t { NORMAL, MAP, VIEWS };

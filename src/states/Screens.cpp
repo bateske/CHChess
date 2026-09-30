@@ -389,7 +389,7 @@ static void playInput() {
     stage::setBlocked(!k);
     if (arduboy.justPressed(A_BUTTON) && !bHeld) {
         if (s != 0xFF) tryTarget(c);
-        else if (!k) audio::sfx(Sfx::Deny);
+        else if (!k) stage::deny();
         else {
             stage::select(c, to, cap, k);
             stage::setCursor(nearest(to, k, c, 0, 0));

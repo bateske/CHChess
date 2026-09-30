@@ -13,7 +13,7 @@ Cam cam = {0, 40, false};
 uint8_t tileH = 5;
 bool flat;
 bool coords = true;
-uint8_t darkSq = FELT, lightSq = SKIN, tableCol = NAVY, tableDot = WINE, tableShadow = INK;
+uint8_t darkSq = FELT, lightSq = SKIN, tableCol = NAVY, tableShadow = INK;
 
 void setView(bool m) { flat = m; }
 
@@ -180,23 +180,8 @@ void tileBorder(uint8_t sq, uint8_t inset, uint8_t c, uint8_t c2, uint8_t phase)
 // Table and board
 // ---------------------------------------------------------------------------
 
-// A casino carpet: a lattice of dots that scrolls with the camera, so pans
-// read as motion. One pattern row, copied.
-void drawTable() {
-    gfx_clear(tableCol);
-    uint8_t row[GFX_FB_STRIDE];
-    int camx = flat ? 0 : cam.x, camy = flat ? 0 : cam.y;
-    for (int phase = 0; phase < 2; phase++) {
-        memset(row, (tableCol << 4) | tableCol, sizeof row);
-        int ox = camx + phase * 8;
-        for (int x = (16 - (ox & 15)) & 15; x < GFX_W; x += 16) {
-            uint8_t &b = row[x >> 1];
-            b = (x & 1) ? (uint8_t)((b & 0x0F) | (tableDot << 4)) : (uint8_t)((b & 0xF0) | tableDot);
-        }
-        for (int y = (16 - ((camy + phase * 8) & 15)) & 15; y < GFX_H; y += 16)
-            memcpy(gfx_fb + y * GFX_FB_STRIDE, row, sizeof row);
-    }
-}
+// A plain carpet.
+void drawTable() { gfx_clear(tableCol); }
 
 // The two slab faces below the near edges, row by row: the face's top
 // boundary is exactly the tiles' edge staircase. left: the edge from the

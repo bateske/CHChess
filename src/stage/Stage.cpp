@@ -28,6 +28,7 @@ static const uint8_t RM_HIT[16] = {INK, WHITE, WHITE, WHITE, WHITE, WHITE, WHITE
                                    WHITE, WHITE, WHITE, WHITE, WHITE, WHITE, WHITE, WHITE};   // struck: a white flash
 static const uint8_t RM_PREY[16] = {INK, RED, RED, RED, RED, RED, RED, RED,
                                     RED, RED, RED, RED, RED, RED, RED, RED};         // about to be: a red one
+static const uint8_t RM_ALERT[16] = {0, RED, 2, 3, 4, WINE, 6, 7, RED, WINE, 10, 11, 12, 13, 14, 15};   // your glove, denied
 
 static const uint8_t *remapFor(uint8_t p) { return SIDE_REMAP[(p & eng::BLACK) ? 1 : 0]; }
 static const PieceArt &art(uint8_t p) { return PIECE_ART[(p & eng::TYPE) - 1]; }
@@ -91,6 +92,7 @@ static bool outWait, zoomDrawn = true;
 static const uint8_t CAPTURE_SLOW = 2;
 static uint8_t slowF = 1;
 static bool blocked;                 // the piece under the glove has no move
+static uint8_t denyT;                // ... and A was pressed on it: NO MOVES and the glove flash red
 
 // The last move in words where the hover plate goes, popping up word by
 // word: "KNIGHT TO F3", "ROOK TAKES QUEEN ON A4".
@@ -183,6 +185,10 @@ void setCoords(bool on) { iso::coords = on; }
 void setFast(bool on) { fast = on; }
 uint8_t selected() { return sel; }
 void setBlocked(bool b) { blocked = b; }
+void deny() {
+    denyT = 24;
+    audio::sfx(Sfx::Deny);
+}
 
 void setView(uint8_t v) {
     viewMode = v;
@@ -512,6 +518,7 @@ void update() {
     }
 
     if (holdT) holdT--;
+    if (denyT) denyT--;
     if (outWait && !fx::particles()) { outWait = false; zoomTo = inspecting ? 10 : 5; }
     // Going out, the camera jumps with each step to the move's new framing
     // rather than drifting between them: clean steps, no wobble.
@@ -738,7 +745,7 @@ static void drawFinger(uint32_t frame) {
     if (tapT) bob = (tapT < 6 ? tapT : 12 - tapT) / 2;
     bob = zoomed(bob);
     sprite4(HAND, x - zoomed(HAND_TIP), y - zoomed(HAND[1]) + bob - 1,
-            humanTurn ? RM_ID : RM_CPU, 0, zscale());
+            !humanTurn ? RM_CPU : denyT & 4 ? RM_ALERT : RM_ID, 0, zscale());
 }
 
 // ---------------------------------------------------------------------------
@@ -787,7 +794,7 @@ static void drawHud(uint32_t frame) {
         // What the finger is on: a piece, or where the picked-up one would go.
         char sq[3] = {(char)('A' + (cur & 7)), (char)('1' + (cur >> 3)), 0};
         const char *w[4] = {NAMES[shown[sel != 0xFF ? sel : cur] & eng::TYPE], " ", sq, blocked ? " NO MOVES" : ""};
-        uint8_t c[4] = {WHITE, WHITE, GOLD, SILVER};
+        uint8_t c[4] = {WHITE, WHITE, GOLD, (uint8_t)(denyT & 4 ? RED : SILVER)};
         if (sel != 0xFF && shown[cur]) { w[1] = " TAKES "; c[1] = RED; w[2] = NAMES[shown[cur] & eng::TYPE]; c[2] = WHITE; }
         else if (sel != 0xFF) { w[1] = " TO "; c[1] = SILVER; }
         plate(w, c, 4, py, 256, 99);
@@ -821,7 +828,7 @@ static uint32_t signature(uint32_t frame, uint32_t ui) {
     uint32_t v[] = {
         (uint32_t)cam.x, (uint32_t)cam.y, cam.flip, cur, sel, viewMode, tileH, intent, humanTurn, thinking,
         picking, fingerSq, (uint32_t)(fx16 >> 4), (uint32_t)(fy16 >> 4), frame >> 3, match::lastTo,
-        match::checkSq, nTgt, over, tapT, annT, ui, waitPress,
+        match::checkSq, nTgt, over, tapT, annT, ui, waitPress, denyT,
     };
     for (uint32_t x : v) h = (h ^ x) * 16777619u;
     return h;

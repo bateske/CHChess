@@ -65,7 +65,8 @@ with nothing that way it wraps round to the
 farthest spot the other way, so pressing on steps through them all. A plate
 at the foot of the screen names what it is on ("KNIGHT G1", "BISHOP F1 NO
 MOVES", "KNIGHT TO F3", "KNIGHT TAKES PAWN"), then calls out each move as
-it lands. During your turn the other side's last move is lit in gold.
+it lands. A on a piece with no moves buzzes, and NO MOVES and the glove
+flash red. During your turn the other side's last move is lit in gold.
 
 Check is an event: CHECK! stays up until you press a button (as does
 CHECKMATE!, before the result: the only things that stop play), the king's square marches red, the king's body

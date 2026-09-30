@@ -50,10 +50,10 @@ inline int toScreenX(int wx) { return flat ? wx : wx - cam.x + CX; }
 inline int toScreenY(int wy) { return flat ? wy : wy - cam.y + CY; }
 
 // Colours: squares, table, shadow.
-extern uint8_t darkSq, lightSq, tableCol, tableDot, tableShadow;
+extern uint8_t darkSq, lightSq, tableCol, tableShadow;
 extern bool coords;                          // letters/numbers round the board
 
-void drawTable();                            // carpet, scrolled with the camera
+void drawTable();                            // the carpet
 void drawBoard();                            // slab or frame, squares, coordinates
 // Border of a square, `inset` px in from its edge. With c2 != c the border
 // is dashed and `phase` marches the dashes round.
