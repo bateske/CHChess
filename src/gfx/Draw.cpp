@@ -57,16 +57,15 @@ static inline __attribute__((always_inline)) void fillRun(uint8_t *row, int a, i
     if (len) *p = (uint8_t)((*p & 0xF0) | c);
 }
 
-RAMFUNC(sprite4) void sprite4(const uint8_t *d, int x, int y, const uint8_t *remap, uint8_t flags, int scale) {
-    uint8_t w = d[0], h = d[1];
+RAMFUNC(sprite4) void sprite4(const uint8_t *d, int x, int y, const uint8_t *remap, int scale) {
+    uint8_t h = d[1];
     d += 2;
-    bool mirror = flags & SPR_MIRROR;
     for (int j = 0; j < h; j++) {
         uint8_t n = *d++;
         const uint8_t *runs = d;
         d += n;
-        if (scale == 256 && !mirror) {
-            // 1:1, facing as drawn (nearly always): a running x.
+        if (scale == 256) {
+            // 1:1 (nearly always): a running x.
             if ((unsigned)(y + j) >= GFX_H) continue;
             uint8_t *row = gfx_fb + (y + j) * GFX_FB_STRIDE;
             int q = x;
@@ -78,7 +77,7 @@ RAMFUNC(sprite4) void sprite4(const uint8_t *d, int x, int y, const uint8_t *rem
             }
             continue;
         }
-        // Scaled or mirrored: source row j covers screen rows [j * scale,
+        // Scaled: source row j covers screen rows [j * scale,
         // (j + 1) * scale) >> 8, and a run [px, px + len) the columns scaled
         // the same way (trailing transparency is implicit).
         for (int yy = y + ((j * scale) >> 8); yy < y + (((j + 1) * scale) >> 8); yy++) {
@@ -87,10 +86,10 @@ RAMFUNC(sprite4) void sprite4(const uint8_t *d, int x, int y, const uint8_t *rem
             int px = 0;
             for (uint8_t i = 0; i < n; i++) {
                 uint8_t b = runs[i];
-                int len = (b >> 4) + 1, p0 = mirror ? w - px - len : px;
+                int len = (b >> 4) + 1;
                 if ((b & 15) != 15) {
-                    int a = x + ((p0 * scale) >> 8);
-                    fillRun(row, a, x + (((p0 + len) * scale) >> 8) - a, remap[b & 15]);
+                    int a = x + ((px * scale) >> 8);
+                    fillRun(row, a, x + (((px + len) * scale) >> 8) - a, remap[b & 15]);
                 }
                 px += len;
             }
@@ -111,10 +110,10 @@ RAMFUNC(spriterot) static void rotSpan(const uint8_t *src, int sw, int sh, int x
 }
 
 void spriteRot(const uint8_t *d, int ax, int ay, int px, int py, uint8_t angle, int scale,
-               const uint8_t *remap, bool mirror) {
+               const uint8_t *remap) {
     int w = d[0], h = d[1], stride = (w + 1) >> 1;
     if (stride * h > 1024 || scale <= 0) return;
-    // Decode to raw 4 bpp (15 = transparent), mirrored if asked.
+    // Decode to raw 4 bpp (15 = transparent).
     uint8_t *buf = gfx_chunkScratch();
     for (int i = 0; i < stride * h; i++) buf[i] = 0xFF;
     const uint8_t *p = d + 2;
@@ -126,13 +125,11 @@ void spriteRot(const uint8_t *d, int ax, int ay, int px, int py, uint8_t angle, 
             int len = (b >> 4) + 1;
             uint8_t c = b & 15;
             for (int k = 0; k < len; k++, x++) {
-                int xx = mirror ? w - 1 - x : x;
-                uint8_t &q = buf[j * stride + (xx >> 1)];
-                q = (xx & 1) ? (uint8_t)((q & 0x0F) | (c << 4)) : (uint8_t)((q & 0xF0) | c);
+                uint8_t &q = buf[j * stride + (x >> 1)];
+                q = (x & 1) ? (uint8_t)((q & 0x0F) | (c << 4)) : (uint8_t)((q & 0xF0) | c);
             }
         }
     }
-    if (mirror) ax = w - 1 - ax;
     // Inverse map: screen offset (dx, dy) from the pivot -> source pixel.
     int cs = fx::isin(angle + 64), sn = fx::isin(angle);            // Q8
     int32_t ic = (int32_t)cs * 256 / scale, is = (int32_t)sn * 256 / scale;   // Q8, divided by scale

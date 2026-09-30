@@ -18,7 +18,6 @@ bool begin(bool on) { simOn = on; return true; }
 void setOn(bool on) { simOn = on; }
 void sfx(Sfx s) { if (simOn) simLast = (uint8_t)s; }
 bool playing() { return false; }
-void blip(uint16_t, uint16_t) {}
 void update() {}
 void led(Led) {}
 }
@@ -63,6 +62,9 @@ static const Step TURN[]    = { S(2637, 0, 40), S(3520, 0, 90) };
 static const Step TITLE[]   = {
     S(1568, 0, 90), S(2093, 0, 90), S(2637, 0, 90), S(3136, 0, 180), REST(40),
     S(2637, 0, 90), S(3136, 0, 360) };
+// The CPU's clock while it thinks: the faintest clicks (played soft).
+static const Step TICK[]    = { S(1100, 0, 3) };
+static const Step TOCK[]    = { S(850, 0, 3) };
 
 struct SfxDef { const Step *steps; uint8_t n, prio; };
 #define DEF(a, p) { a, (uint8_t)(sizeof(a) / sizeof(a[0])), p }
@@ -70,16 +72,17 @@ static const SfxDef DEFS[(int)Sfx::COUNT] = {
     DEF(CURSOR, 0), DEF(SELECT, 1), DEF(DENY, 1), DEF(LAND, 1), DEF(HOP, 1), DEF(CAPTURE, 2),
     DEF(COIN, 1), DEF(CHECK, 3), DEF(CASTLE, 2), DEF(PROMOTE, 3), DEF(WHOOSH, 1), DEF(FLIP, 1),
     DEF(MATE, 4), DEF(WIN, 4), DEF(LOSE, 4), DEF(DRAW, 4), DEF(TURN, 1), DEF(TITLE, 2),
+    DEF(TICK, 0), DEF(TOCK, 0),
 };
 
 // --- Sequencer state (shared with the 1 kHz interrupt) ----------------------
 static volatile const Step *fxSteps = nullptr;
 static volatile uint8_t fxN = 0, fxI = 0, fxPrio = 0;
 static volatile uint16_t fxT = 0;
-static Step blipStep;
 
 static bool started = false, running = false;
 static uint16_t lastHz = 0;
+static volatile bool soft;           // the clock: a narrow pulse, quieter than any effect
 static uint8_t ledPattern = 0;
 static uint16_t ledT = 0;
 
@@ -125,7 +128,7 @@ static void tone(uint16_t hz) {
     running = true;
     TIM1->CTLR1 = 0;
     TIM1->ATRLR = period - 1;
-    TIM1->CH2CVR = period / 2;
+    TIM1->CH2CVR = soft ? period / 8 : period / 2;
     TIM1->SWEVGR = 1;
     TIM1->INTFR = 0;
     TIM1->CTLR1 = 0x81;
@@ -161,28 +164,17 @@ bool begin(bool on) {
 
 void setOn(bool on) { begin(on); }
 
-static void play(const Step *st, uint8_t n, uint8_t prio) {
-    if (!started) return;
-    if (fxSteps && prio < fxPrio) return;
-    __disable_irq();
-    fxSteps = st; fxN = n; fxI = 0; fxT = 0; fxPrio = prio;
-    __enable_irq();
-}
-
 void sfx(Sfx s) {
     const SfxDef &d = DEFS[(int)s];
-    play(d.steps, d.n, d.prio);
+    if (!started) return;
+    if (fxSteps && d.prio < fxPrio) return;
+    __disable_irq();
+    fxSteps = d.steps; fxN = d.n; fxI = 0; fxT = 0; fxPrio = d.prio;
+    soft = s >= Sfx::Tick;
+    __enable_irq();
 }
 
 bool playing() { return fxSteps != nullptr; }
-
-void blip(uint16_t hz, uint16_t ms) {
-    if (fxSteps && fxPrio > 0) return;
-    __disable_irq();
-    blipStep.hz = hz; blipStep.endHz = 0; blipStep.ms = ms;
-    __enable_irq();
-    play(&blipStep, 1, 0);
-}
 
 void led(Led p) { ledPattern = p; ledT = 0; }
 

@@ -14,7 +14,7 @@
 struct Options {
     uint8_t sound;      // 0 off, 1 on
     uint8_t felt;       // board colour theme (pal::Theme)
-    uint8_t hints;      // show where a picked-up piece can go
+    uint8_t unused;     // was hints (always on now): kept so saves keep their layout
     uint8_t coords;     // letters and numbers on the board's rim
     uint8_t speed;      // 0 normal, 1 fast (the CPU's camera and moves)
     uint8_t level;      // last opponent chosen

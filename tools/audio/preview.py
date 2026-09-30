@@ -20,7 +20,7 @@ from chsim import find_cxx  # noqa: E402
 
 # Must match enum class Sfx in src/audio/Audio.h.
 SFX = ["cursor", "select", "deny", "land", "hop", "capture", "coin", "check", "castle", "promote",
-       "whoosh", "flip", "mate", "win", "lose", "draw", "turn", "title", "tick"]
+       "whoosh", "flip", "mate", "win", "lose", "draw", "turn", "title", "tick", "tock"]
 
 
 def build(src, out):

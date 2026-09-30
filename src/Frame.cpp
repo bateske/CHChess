@@ -23,9 +23,11 @@ namespace frame {
 // short smooth bursts beat drawing thinly all along. A button starts a burst
 // at once, and a held one or an open menu keeps it going. The engine calls
 // back every 8 nodes (CH2K_POLL_NODES, ~5 ms), so that is prompt. Between
-// bursts, a frame every BOB_MS keeps the glove bobbing (a step of it each).
-static const uint16_t FIRST_MS = 300, SEARCH_MS = 2000, BURST_MS = 450, BOB_MS = 133;
-static uint32_t burstAt, bobAt;
+// bursts, a frame every BOB_MS keeps the glove bobbing (a step of it each),
+// and a soft clock ticks and tocks every TICK_MS.
+static const uint16_t FIRST_MS = 300, SEARCH_MS = 2000, BURST_MS = 450, BOB_MS = 133, TICK_MS = 1000;
+static uint32_t burstAt, bobAt, tickAt;
+static bool tock;
 // Lockstep (scripts, the simulator): one frame per two polls, i.e. per 16
 // nodes, so a scripted CPU move always takes the same frames.
 static const uint8_t POLLS_PER_FRAME = 2;
@@ -118,6 +120,10 @@ static void thinkFrame() {
 #endif
     uint32_t now = millis();
     if (eng::nodes() <= 8) burstAt = now + FIRST_MS;        // a new search
+    if ((int32_t)(now - tickAt) >= 0) {
+        tickAt = now + TICK_MS;
+        audio::sfx((tock = !tock) ? Sfx::Tock : Sfx::Tick);
+    }
     if ((int32_t)(now - burstAt) < 0 && !(chgame_readButtons() | arduboy.injected)) {
         if ((int32_t)(now - bobAt) >= 0) {
             bobAt = now + BOB_MS;

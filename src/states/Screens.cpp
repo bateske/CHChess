@@ -94,7 +94,6 @@ static void persist(bool withGame) {
 static void applyOptions() {
     audio::setOn(opt.sound != 0);
     pal::setTheme(opt.felt);
-    stage::setHints(opt.hints != 0);
     stage::setCoords(opt.coords != 0);
     stage::setFast(opt.speed != 0);
 }
@@ -262,7 +261,7 @@ static void setupRender(uint32_t frame) {
 
     static const char *const SIDE[3] = {"PLAY WHITE", "PLAY BLACK", "RANDOM SIDE"};
     choice(81, SIDE[opt.side], sel == 1, frame);
-    menuItem(104, "DEAL ME IN", sel == 2, frame);
+    menuItem(104, "BEGIN", sel == 2, frame);
 }
 
 // ---------------------------------------------------------------------------
@@ -556,11 +555,12 @@ static void playRender(uint32_t frame) {
 // their tests start games directly)
 // ---------------------------------------------------------------------------
 #if !CHCH_LEAN
-enum Opt : uint8_t { O_SOUND, O_FELT, O_HINTS, O_COORDS, O_SPEED, O_BACK, OPT_COUNT };
+enum Opt : uint8_t { O_SOUND, O_FELT, O_COORDS, O_SPEED, O_BACK, OPT_COUNT };
 static const char *const OPT_TEXT[OPT_COUNT] = {
-    "SOUND|OFF|ON", "BOARD|GREEN|BLUE|RED|PURPLE", "HINTS|OFF|ON", "COORDS|OFF|ON", "PACE|FUN|QUICK",
-    "BACK",
+    "SOUND|OFF|ON", "BOARD|GREEN|BLUE|RED|PURPLE", "COORDS|OFF|ON", "PACE|FUN|QUICK", "BACK",
 };
+// The option's byte in Options (past the retired hints byte).
+static uint8_t &optByte(uint8_t i) { return ((uint8_t *)&opt)[i + (i >= O_COORDS)]; }
 
 static uint8_t optField(const char *s, uint8_t k, char *buf) {
     uint8_t n = 0;
@@ -582,8 +582,8 @@ static void optionsUpdate() {
     if (d && sel != O_BACK) {
         char tmp[12];
         uint8_t n = (uint8_t)(optField(OPT_TEXT[sel], 0, tmp) - 1);
-        uint8_t *f = (uint8_t *)&opt + sel;
-        *f = (uint8_t)((*f + n + d) % n);
+        uint8_t &f = optByte(sel);
+        f = (uint8_t)((f + n + d) % n);
         applyOptions();
         audio::sfx(Sfx::Coin);
     }
@@ -607,7 +607,7 @@ static void optionsRender(uint32_t frame) {
         }
         if (i == O_BACK) { centred2(y, label, i == sel ? GOLD : WHITE); continue; }
         text35x2(15, y, label, i == sel ? GOLD : WHITE);
-        optField(OPT_TEXT[i], (uint8_t)(((uint8_t *)&opt)[i] + 1), value);
+        optField(OPT_TEXT[i], (uint8_t)(optByte(i) + 1), value);
         text35x2(114 - text35x2Width(value), y, value, i == sel ? WHITE : FELT_LT);
     }
     centred35(110, "ARDUCHESS ENGINE: PETER BROWN", SILVER);
@@ -766,7 +766,7 @@ static bool searching(char cmd) {
 // ---------------------------------------------------------------------------
 void begin() {
     stage::begin();
-    opt.sound = 1; opt.hints = 1; opt.coords = 1;
+    opt.sound = 1; opt.coords = 1;
     save::load(opt, stats, hasGame);
     applyOptions();
 #if CHCH_DEBUG

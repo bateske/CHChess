@@ -8,7 +8,9 @@
 
 enum class Sfx : uint8_t {
     Cursor, Select, Deny, Land, Hop, Capture, Coin, Check, Castle, Promote,
-    Whoosh, Flip, Mate, Win, Lose, Draw, Turn, Title, COUNT
+    Whoosh, Flip, Mate, Win, Lose, Draw, Turn, Title,
+    Tick, Tock,                      // soft (quieter than the rest): keep them last
+    COUNT
 };
 
 namespace audio {
@@ -17,7 +19,6 @@ bool begin(bool on);
 void setOn(bool on);
 void sfx(Sfx s);
 bool playing();                     // an effect is sounding
-void blip(uint16_t hz, uint16_t ms);     // ticks
 void update();                      // once per frame: LED patterns
 
 // Status LED (PB9): short patterns for wins.

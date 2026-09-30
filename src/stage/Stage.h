@@ -25,7 +25,7 @@ void setCursor(uint8_t sq);
 bool flipped();                      // viewing from Black's side
 void select(uint8_t sq, const uint8_t *to, const uint8_t *cap, uint8_t n);
 void deselect();
-uint8_t selected();                  // 0xFF: none
+uint8_t selected();                  // the player's picked-up piece, 0xFF: none
 bool waiting();                      // CHECK! against the player, or CHECKMATE!, waiting for a button
 void acknowledge();                  // ... pressed
 void setBlocked(bool b);             // the piece under the glove has no move (the plate says so)
@@ -40,7 +40,6 @@ void setZoom(uint8_t tileH);         // iso zoom now, 5..10 (the title's close-u
 // screen space push the view to the board's edge or corner that way.
 void inspect(bool on, int dx, int dy);
 void thinkPick();                    // mid-search: the CPU's glove to the piece it is weighing
-void setHints(bool on);              // show the legal moves of a selected piece
 void setCoords(bool on);             // file/rank letters on the rim
 void setFast(bool on);               // quicker CPU turns and moves
 extern const char *opponentName;     // the HUD's name for the CPU

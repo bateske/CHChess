@@ -95,7 +95,7 @@ The weaker opponents choose at random among moves within a margin of the
 best one, so they make human-looking mistakes rather than random blunders.
 Your record against each is on the opponent screen (hold SELECT there to
 clear it). Options: sound, board colour (green, blue, red, purple felt),
-move hints, coordinates, and the pace (FUN, or QUICK: faster CPU turns and moves,
+coordinates, and the pace (FUN, or QUICK: faster CPU turns and moves,
 and no zooming in on them). Options, records and a game in
 progress (SAVE + QUIT, then CONTINUE) are saved to flash and survive
 re-uploading.
@@ -107,10 +107,12 @@ re-uploading.
   evaluation and an opening book, cut here to four plies. It runs
   synchronously; every 8 nodes it calls back into the game. The CPU's
   glove first goes over to its own king, then the search runs, drawing a
-  frame only every 133 ms (the glove keeps bobbing) and stopping every two
-  seconds for a short burst of full-rate frames in which the glove glides
-  to the piece it is weighing (a button press, or a menu, gets frames at
-  once).
+  frame only every 133 ms (the glove keeps bobbing, and a soft clock ticks
+  and tocks) and stopping every two seconds for a short burst of full-rate
+  frames in which the glove glides to the piece it is weighing (a button
+  press, or a menu, gets frames at once). Then it plays as you do: taps
+  its piece, which lifts, carries the glove to the square, rests there a
+  moment and taps again.
 * **The board** is drawn as 2:1 diamonds sampled at pixel centres, so every
   edge is a clean staircase at every zoom step (tiles 20x10 up to 40x20, a
   pixel at a time); pieces are span-encoded sprites rendered from 3D models
