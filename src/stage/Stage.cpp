@@ -677,7 +677,7 @@ static void drawMover(const Mover &m) {
     int x, y, z;
     moverPos(m, x, y, z);
     int sx = toScreenX(x), sy = toScreenY(y);
-    fillEllipse(sx, sy, zoomed(3), (tileH + 2) / 5, INK);    // its shadow stays on the board
+    gfx_fillEllipse(sx, sy, zoomed(3), (tileH + 2) / 5, INK);    // its shadow stays on the board
     drawPiece(m.piece, sx, sy - z, nullptr, zscale());
 }
 
@@ -729,7 +729,7 @@ static void drawPieces(uint32_t frame) {
                 rm = RM_PREY;
             }
             if (sq == sel) {
-                fillEllipse(x, y, zoomed(3), (tileH + 2) / 5, INK);
+                gfx_fillEllipse(x, y, zoomed(3), (tileH + 2) / 5, INK);
                 y -= zoomed(3) + (zoomed(fx::isin((int)(frame >> 3) * 48)) >> 8);
             }
             drawPiece(p, x, y, rm, zscale());

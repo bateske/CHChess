@@ -1,4 +1,5 @@
 #pragma GCC optimize("Os")   // cold code: size over speed (hot pixel loops live in Draw/Mask)
+#include <string.h>
 #include <CHGfx.h>
 #include "Palette.h"
 
@@ -40,7 +41,6 @@ static const uint16_t SHIMMER[8] = {0x6EF, 0x7EF, 0x9EF, 0xAFF, 0xBFF, 0xCFF, 0x
 static const uint16_t PULSE[8]   = {0xE12, 0xE32, 0xE52, 0xF72, 0xF82, 0xF92, 0xFB2, 0xFC2};
 
 static uint16_t staged[16];
-static uint16_t committed[16];
 static bool     dirty = true;
 static uint8_t  themeIdx = 0, fadeLevel = 16;
 static bool     cycling = true;
@@ -48,7 +48,7 @@ static uint32_t ticks = 0;
 static uint8_t  mode = CASINO;
 
 void init() {
-    for (uint8_t i = 0; i < 16; i++) staged[i] = BASE[i];
+    memcpy(staged, BASE, sizeof staged);
     dirty = true;
     commit();
 }
@@ -74,17 +74,25 @@ static uint8_t tri(uint32_t t) { t &= 31; return (uint8_t)(t > 15 ? 31 - t : t);
 void tick() {
     ticks++;
     if (!cycling) return;
+    uint16_t a, b;
     if (mode == TARGETS) {
-        staged[FX_A] = SHIMMER[tri(ticks * 2) >> 1];
-        staged[FX_B] = PULSE[tri(ticks * 2 + 16) >> 1];
+        a = SHIMMER[tri(ticks * 2) >> 1];
+        b = PULSE[tri(ticks * 2 + 16) >> 1];
     } else {
-        staged[FX_A] = mode == HOVER ? (uint16_t)(tri(ticks >> 1) * 0x111) : RAINBOW[(ticks / 3) % 12];
+        a = mode == HOVER ? (uint16_t)(tri(ticks >> 1) * 0x111) : RAINBOW[(ticks / 3) % 12];
         // FX_B: triangle wave GOLD <-> WHITE over 32 frames.
         uint8_t t = tri(ticks);
-        uint8_t g = (uint8_t)(12 + (t * 3) / 15), b = (uint8_t)(2 + (t * 13) / 15);
-        staged[FX_B] = (uint16_t)(0xF00 | (g << 4) | b);
+        uint8_t g = (uint8_t)(12 + (t * 3) / 15), bl = (uint8_t)(2 + (t * 13) / 15);
+        b = (uint16_t)(0xF00 | (g << 4) | bl);
     }
-    dirty = true;
+    // Only a tick that moves FX_A/FX_B marks the palette dirty: each commit
+    // costs CHGfx a LUT rebuild at the next flush (and about one tick in ten
+    // changes nothing). A late frame that runs several ticks can move a
+    // colour and back, and then commits it unchanged; that is rare.
+    if (a != staged[FX_A] || b != staged[FX_B]) {
+        staged[FX_A] = a; staged[FX_B] = b;
+        dirty = true;
+    }
 }
 
 void resetClock() { ticks = 0; }
@@ -100,10 +108,6 @@ void commit() {
         uint16_t b = (uint16_t)(((c & 15) * fadeLevel) >> 4);
         out[i] = (uint16_t)((((r << 1) | (r >> 3)) << 11) | (((g << 2) | (g >> 2)) << 5) | ((b << 1) | (b >> 3)));
     }
-    bool same = true;
-    for (uint8_t i = 0; i < 16; i++) if (out[i] != committed[i]) { same = false; break; }
-    if (same) return;
-    for (uint8_t i = 0; i < 16; i++) committed[i] = out[i];
     gfx_setPalette(out, 16);
 }
 

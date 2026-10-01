@@ -36,18 +36,18 @@ CHBlackjack. See `NOTICE`.
 
 You need the Arduino IDE (2.x) or `arduino-cli`, and:
 
-1. **The CHGame board package, 0.2.2 or later** (Boards Manager URL
+1. **The CHGame board package, 0.2.4 or later** (Boards Manager URL
    `https://github.com/bateske/CH32SerialBoot/releases/latest/download/package_chgame_index.json`).
-2. **The CHGfx library, 1.2.0** from <https://github.com/bateske/CHgfx>.
+2. **The CHGfx library, 1.3.0** from <https://github.com/bateske/CHgfx>.
 3. **This repository**, in a folder named `CHChess`.
 
 The game needs **link-time optimisation** to fit the 50,944-byte application
-region (it is 50.3 KB with it, 56 KB without). With a board package that
-has it, pick *Tools > Optimize > Smallest + LTO* (see
-[docs/CH32SerialBoot-notes.md](docs/CH32SerialBoot-notes.md)). From the
-command line, on any CHGame package:
+region (it is 48.9 KB with it, 51.3 KB without): pick
+*Tools > Optimize > Smallest + LTO*. Pick *Tools > USB > Upload only* too:
+the game has no use for USB Serial, leaving it out saves 0.6 KB, and
+uploading works as before. From the command line:
 
-    arduino-cli compile -b CHGame:ch32v:CHGame:opt=osstd,rtlib=nano,periph=game --build-property build.extra_flags=-flto CHChess
+    arduino-cli compile -b CHGame:ch32v:CHGame:opt=oslto,rtlib=nano,periph=game,usb=uploadonly CHChess
     arduino-cli upload  -b CHGame:ch32v:CHGame -p COMx CHChess
 
 (`python tools/device.py build` does the same.)

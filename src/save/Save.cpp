@@ -3,6 +3,7 @@
 #include <string.h>
 #include <CHGfx.h>
 #include "../../config.h"
+#include "../RamFunc.h"
 #include "Save.h"
 
 namespace save {
@@ -57,7 +58,6 @@ static uint32_t imageEnd() {
 
 // Flash controller, mirrored from CH32SerialBoot/bootloader/src/flash.c.
 // Must run from SRAM, with interrupts off (the vector table is in flash).
-#define RAMFUNC __attribute__((section(".srodata.ramfunc.save"), noinline))
 #define CR_STRT 0x00000040u
 #define CR_FLOCK 0x00008000u
 #define CR_PAGE_PG 0x00010000u
@@ -67,7 +67,7 @@ static uint32_t imageEnd() {
 #define SR_BSY 0x00000001u
 #define PROG(a) ((a) + 0x08000000u)
 
-RAMFUNC static void pageWrite(uint32_t addr, const uint32_t *w) {
+RAMFUNC(save) static void pageWrite(uint32_t addr, const uint32_t *w) {
     uint32_t irq;
     __asm volatile("csrr %0, 0x800" : "=r"(irq));
     __asm volatile("csrw 0x800, %0" : : "r"(irq & ~0x88u));

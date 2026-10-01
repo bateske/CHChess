@@ -134,7 +134,10 @@ static void execute() {
             fmtStr(p, " 8224\n");
             print(buf);
             out(gfx_fb, GFX_FB_BYTES);
-            out((const uint8_t *)gfx_pal, 32);
+            for (uint8_t i = 0; i < 16; i++) {       // as the panel shows it, fade included
+                uint16_t c = gfx_paletteOut(i);
+                out((const uint8_t *)&c, 2);
+            }
             break;
         case 'K':
             arduboy.injected = (uint8_t)parseNum(args, 16);

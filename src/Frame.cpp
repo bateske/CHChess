@@ -19,13 +19,14 @@ namespace frame {
 // While the CPU thinks, the search runs flat out - no frames at all - and
 // every SEARCH_MS stops for a BURST_MS burst of frames at the full rate: the
 // CPU's glove glides to the piece it is weighing (stage::thinkPick). On the
-// board a flush alone costs the search ~5 ms of CPU and a redraw ~8 more, so
-// short smooth bursts beat drawing thinly all along. A button starts a burst
-// at once, and a held one or an open menu keeps it going. The engine calls
-// back every 8 nodes (CH2K_POLL_NODES, ~5 ms), so that is prompt. Between
-// bursts, a frame every BOB_MS keeps the glove bobbing (a step of it each),
-// and a soft clock ticks and tocks every TICK_MS: slowly, so time seems to
-// slow down (and the search's hiccups hide between the beats).
+// board a flush alone costs the search ~2.6 ms of CPU (~5 ms before CHGfx
+// 1.3) and a redraw ~8 more, so short smooth bursts beat drawing thinly all
+// along. A button starts a burst at once, and a held one or an open menu
+// keeps it going. The engine calls back every 8 nodes (CH2K_POLL_NODES,
+// ~5 ms), so that is prompt. Between bursts, a frame every BOB_MS keeps the
+// glove bobbing (a step of it each), and a soft clock ticks and tocks every
+// TICK_MS: slowly, so time seems to slow down (and the search's hiccups hide
+// between the beats).
 static const uint16_t FIRST_MS = 300, SEARCH_MS = 2000, BURST_MS = 450, BOB_MS = 133, TICK_MS = 2000;
 static uint32_t burstAt, bobAt, tickAt;
 static bool tock;

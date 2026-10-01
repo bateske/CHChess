@@ -3,12 +3,15 @@
     python chsim.py build <sketch dir> [-D NAME=VAL ...]   -> prints the .exe path
 
 Compiles the sketch's .ino and every .cpp/.c under its src/ folder, the
-installed CHGfx library's drawing code (unmodified), and the host shims in
-host/.
+installed CHGfx library's portable code (every src/*.cpp except CHGfx.cpp,
+unmodified: drawing, extras, text effects, palette), and the host shims in
+host/, where chgfx_host.cpp stands in for CHGfx.cpp.
 
-CHGfx is found in the Arduino sketchbook: $CHSIM_SKETCHBOOK, else what
-`arduino-cli config get directories.user` reports, else ~/Documents/Arduino
-(~/Arduino on Linux). $CHSIM_CHGFX may point straight at CHGfx's src folder.
+CHGfx is found in the Arduino sketchbook's libraries/CHGfx, or libraries/CHGfx*
+(a GitHub zip installs as CHGfx-main). The sketchbook is $CHSIM_SKETCHBOOK,
+else what `arduino-cli config get directories.user` reports, else
+~/Documents/Arduino (~/Arduino on Linux). $CHSIM_CHGFX may point straight at
+CHGfx's src folder.
 
 Compiler: $CHSIM_CXX (e.g. "zig c++"), else zig on the PATH, else the
 ziglang pip package (`pip install ziglang`), else clang++ or g++.
@@ -41,6 +44,11 @@ def sketchbook():
 def chgfx_dir():
     env = os.environ.get("CHSIM_CHGFX")
     d = Path(env) if env else sketchbook() / "libraries" / "CHGfx" / "src"
+    if not env and not (d / "CHGfx_draw.cpp").exists():
+        # A GitHub zip installs as libraries/CHGfx-main (or -1.3.0, ...).
+        found = sorted((sketchbook() / "libraries").glob("CHGfx*/src/CHGfx_draw.cpp"))
+        if found:
+            d = found[-1].parent
     if not (d / "CHGfx_draw.cpp").exists():
         raise SystemExit(f"CHGfx not found at {d}: install the library or set CHSIM_CHGFX")
     return d
@@ -84,7 +92,7 @@ def build(sketch, defines=(), out=None):
             f.write("\n")
     srcs = [unit]
     srcs += sorted(p for p in (sketch / "src").rglob("*") if p.suffix in (".cpp", ".c"))
-    srcs.append(chgfx / "CHGfx_draw.cpp")
+    srcs += sorted(p for p in chgfx.glob("*.cpp") if p.name != "CHGfx.cpp")
     srcs += sorted((HERE / "host").glob("*.cpp"))
     exe = Path(out) if out else bdir / "sim.exe"
     cmd = find_cxx() + [

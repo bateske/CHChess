@@ -5,6 +5,7 @@
 #include "../gfx/Draw.h"
 #include "../gfx/Mask.h"
 #include "../gfx/Palette.h"
+#include "../RamFunc.h"
 
 namespace fx {
 
@@ -176,7 +177,7 @@ void drawBanner() {
         }
     }
     uint8_t outline = bannerStyle == B_RAINBOW ? FX_A : INK;
-    maskDraw(m, 64 - w / 2, bannerCy - h / 2 - 2, WHITE, outline, bannerStyle == B_RAINBOW ? INK : WINE, ramp);
+    maskDraw(m, 64 - w / 2, bannerCy - h / 2 - 2, outline, bannerStyle == B_RAINBOW ? INK : WINE, ramp);
 }
 
 // ---------------------------------------------------------------------------
@@ -190,8 +191,7 @@ void shake(uint8_t frames, uint8_t amp) { shakeT = frames; shakeAmp = amp; }
 // word copies from SRAM (newlib's memmove is a byte loop in flash: ~10 ms a
 // shaken frame). Walks away from the direction of travel so every source row
 // is read before it is overwritten; rows the move uncovers shift in place.
-__attribute__((section(".srodata.ramfunc.shake"), noinline))
-static void shiftRows(int y0, int y1, int dy, bool right) {
+RAMFUNC(shake) static void shiftRows(int y0, int y1, int dy, bool right) {
     const int W = GFX_FB_STRIDE / 4;
     for (int k = 0; k <= y1 - y0; k++) {
         int y = dy > 0 ? y1 - k : y0 + k, sy = y - dy;

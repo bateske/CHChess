@@ -111,12 +111,12 @@ static void feltBackdrop() {
 // Big lettering in PPOT's font with a gradient, outline and shadow.
 static void title35(const char *text, int y, uint8_t scale, uint8_t top, uint8_t mid, uint8_t low,
                     uint8_t shadow, uint8_t lowFrom) {
-    int h = 6 * scale;
-    Mask m = maskBegin(124, h);
+    int h = 6 * scale, w = text35WidthScaled(text, scale);
+    Mask m = maskBegin(w, h);                    // just the lettering's bytes
     maskText35(m, 0, 0, text, scale);
     uint8_t ramp[32];
     for (int i = 0; i < h + 2 && i < 32; i++) ramp[i] = i < scale ? top : (i < lowFrom ? mid : low);
-    maskDraw(m, 64 - text35WidthScaled(text, scale) / 2, y, mid, INK, shadow, ramp);
+    maskDraw(m, 64 - w / 2, y, INK, shadow, ramp);
 }
 
 static void centred35(int y, const char *s, uint8_t c) { text35(64 - text35Width(s) / 2, y, s, c); }

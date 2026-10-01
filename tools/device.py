@@ -5,11 +5,14 @@
     python tools/device.py run SCRIPT OUTDIR       debug build, upload, run a chdrive script
     python tools/device.py shot OUT.png            screenshot of a running debug build
 
-The game must be built with opt=osstd (the IDE's default "Smallest") and
-periph=game (the default Peripherals setting of CHGame core 0.2.2+): it
-does not fit in the 50,944-byte application region at -O2 or with the full
-peripheral set. The debug protocol is enabled through build.extra_flags,
-which is empty on this platform.
+Needs CHGame board package 0.2.4+. The game must be built with opt=oslto
+("Smallest + LTO") and periph=game (the default Peripherals setting): it
+does not fit in the 50,944-byte application region without link-time
+optimisation or with the full peripheral set. Release builds also take
+usb=uploadonly ("Upload only": no Serial, ~0.6 KB smaller; uploading still
+works as usual). Debug builds keep USB Serial, the default, for the debug
+protocol, which is enabled through build.extra_flags (empty on this
+platform).
 """
 import argparse
 import subprocess
@@ -19,18 +22,15 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 SKETCH = HERE.parent
 CHSIM = HERE / "chsim"
-FQBN = "CHGame:ch32v:CHGame:opt=osstd,rtlib=nano,periph=game"
-# CHChess needs link-time optimisation to fit. Board packages with the
-# "Smallest + LTO" Optimize option (opt=oslto) do it from the menu; this flag
-# does the same on any CHGame package (0.2.2 has no such option).
-LTO = "-flto"
+FQBN = "CHGame:ch32v:CHGame:opt=oslto,rtlib=nano,periph=game"
+RELEASE = FQBN + ",usb=uploadonly"
 
 
 def build(debug):
     out = SKETCH / "build" / ("debug" if debug else "release")
-    cmd = ["arduino-cli", "compile", "-b", FQBN, "--build-path", str(out)]
-    flags = LTO + (" -DCHCH_DEBUG=1" if debug else "")
-    cmd += ["--build-property", f"build.extra_flags={flags}"]
+    cmd = ["arduino-cli", "compile", "-b", FQBN if debug else RELEASE, "--build-path", str(out)]
+    if debug:
+        cmd += ["--build-property", "build.extra_flags=-DCHCH_DEBUG=1"]
     cmd.append(str(SKETCH))
     r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode:

@@ -1,10 +1,13 @@
-// Drawing primitives CHGfx doesn't provide: rounded rects, ellipses,
-// coloured column glyphs, remapped 4 bpp sprites, row-span art, dithering
-// and in-place colour remaps (shadows, dimming). Framebuffer only.
+// The game's own drawing primitives: rounded rects, remapped 4 bpp row-span
+// sprites (plain, scaled, rotated), dithering, coloured column glyphs and
+// PPOT's 3x5 font. CHGfx 1.3 has its own versions of all but the column
+// glyphs (the font as CHGfx_Tiny3x5, with the same glyphs), but they cost
+// more flash here, the text about 2 KB more (docs/CHGfx-notes.md).
+// Framebuffer only.
 //
 // The rule on this chip: code runs from flash with 3 wait states, so a
 // function call per pixel costs ~2-3 us. Everything here is built from
-// gfx_hline spans (word stores, from SRAM) or tight byte loops.
+// gfx_hline spans (word stores, from SRAM) or tight byte and word loops.
 #pragma once
 #include <stdint.h>
 #include <CHGfx.h>
@@ -22,9 +25,7 @@ void sprite4(const uint8_t *data, int x, int y, const uint8_t *remap, int scale 
 void spriteRot(const uint8_t *data, int ax, int ay, int px, int py, uint8_t angle, int scale,
                const uint8_t *remap);
 
-void fillEllipse(int cx, int cy, int rx, int ry, uint8_t c);
 void dither(int x, int y, int w, int h, uint8_t c, uint8_t phase);      // 50% checker
-void remapRect(int x, int y, int w, int h, const uint8_t *remap);       // recolour in place
 
 // Column-major 1 bpp glyph (bit 0 = top row, <= 8 rows), from SRAM.
 void glyph(int x, int y, const uint8_t *cols, uint8_t ncols, uint8_t c);

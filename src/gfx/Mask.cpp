@@ -1,16 +1,17 @@
 #pragma GCC optimize("Os")
+#include <string.h>
 #include <CHGfx.h>
 #include "Mask.h"
 
 #include "Draw.h"
+#include "../RamFunc.h"
 
 Mask maskBegin(int w, int h) {
     Mask m;
     m.w = (uint8_t)w; m.h = (uint8_t)h;
     m.stride = (uint8_t)((w + 2 + 7) >> 3);
     m.bits = gfx_chunkScratch();
-    uint32_t n = (uint32_t)m.stride * (uint32_t)(h + 2);
-    for (uint32_t i = 0; i < n; i++) m.bits[i] = 0;
+    memset(m.bits, 0, (uint32_t)m.stride * (uint32_t)(h + 2));   // newlib's: word stores
     return m;
 }
 
@@ -45,8 +46,7 @@ void maskText35(Mask &m, int x, int y, const char *s, uint8_t scale, const int8_
 // row y, bit 0 at screen column x. A mask byte is eight pixels, four
 // framebuffer bytes, so the bits go two at a time (at an odd x shifted one
 // along first). From SRAM: this loop is most of a banner's cost.
-__attribute__((section(".srodata.ramfunc.maskruns"), noinline))
-static void runs(const uint8_t *row, uint8_t stride, int x, int y, uint8_t c) {
+RAMFUNC(maskruns) static void runs(const uint8_t *row, uint8_t stride, int x, int y, uint8_t c) {
     if ((unsigned)y >= GFX_H) return;
     uint8_t *fb = gfx_fb + y * GFX_FB_STRIDE;
     uint8_t cc = (uint8_t)(c | (c << 4));
@@ -69,9 +69,8 @@ static void runs(const uint8_t *row, uint8_t stride, int x, int y, uint8_t c) {
 }
 
 // Grow row r by one pixel in all 8 directions into out. From SRAM too: it
-// runs for every row twice (outline and shadow).
-__attribute__((section(".srodata.ramfunc.maskdilate"), noinline))
-static void dilateRow(const Mask &m, int r, uint8_t *out) {
+// runs for every row (the outline and the shadow share it).
+RAMFUNC(maskdilate) static void dilateRow(const Mask &m, int r, uint8_t *out) {
     int rows = m.h + 2;
     for (int b = 0; b < m.stride; b++) {
         uint8_t v = m.bits[r * m.stride + b];
@@ -95,18 +94,17 @@ static void dilateRow(const Mask &m, int r, uint8_t *out) {
     }
 }
 
-void maskDraw(const Mask &m, int x, int y, uint8_t fill, int outline, int shadow, const uint8_t *ramp) {
+void maskDraw(const Mask &m, int x, int y, uint8_t outline, uint8_t shadow, const uint8_t *ramp) {
     int rows = m.h + 2;
     int ox = x - 1, oy = y - 1;                          // undo the margin
     uint8_t d[32];
-    if (shadow >= 0) {
-        for (int r = 0; r < rows; r++) {
-            if (outline >= 0) { dilateRow(m, r, d); runs(d, m.stride, ox + 1, oy + r + 1, (uint8_t)shadow); }
-            else runs(m.bits + r * m.stride, m.stride, ox + 1, oy + r + 1, (uint8_t)shadow);
-        }
+    // Each grown row is painted twice: as the shadow, a row down and a pixel
+    // right, then as the outline. Screen row Y still gets its shadow before
+    // its outline, as if all the shadow went down first.
+    for (int r = 0; r < rows; r++) {
+        dilateRow(m, r, d);
+        runs(d, m.stride, ox + 1, oy + r + 1, shadow);
+        runs(d, m.stride, ox, oy + r, outline);
     }
-    if (outline >= 0)
-        for (int r = 0; r < rows; r++) { dilateRow(m, r, d); runs(d, m.stride, ox, oy + r, (uint8_t)outline); }
-    for (int r = 1; r < rows - 1; r++)
-        runs(m.bits + r * m.stride, m.stride, ox, oy + r, ramp ? ramp[r - 1] : fill);
+    for (int r = 1; r < rows - 1; r++) runs(m.bits + r * m.stride, m.stride, ox, oy + r, ramp[r - 1]);
 }

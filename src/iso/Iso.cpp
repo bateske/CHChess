@@ -4,8 +4,7 @@
 #include "Iso.h"
 #include "../gfx/Palette.h"
 #include "../gfx/Draw.h"
-
-#define RAMFUNC(name) __attribute__((section(".srodata.ramfunc." #name), noinline))
+#include "../RamFunc.h"
 
 namespace iso {
 
@@ -46,10 +45,12 @@ void screenOf(uint8_t sq, int &x, int &y) {
 // lies inside the diamond, so neighbours meet without gaps or overlaps and
 // every edge is a clean 2:1 staircase. Map squares: rectangles.
 // ---------------------------------------------------------------------------
-static inline int halfWidth(int k, int th) { return k < th / 2 ? 2 * k + 1 : 2 * (th - 1 - k) + 1; }
+static inline int halfWidth(int k, int th) { return k < (th >> 1) ? 2 * k + 1 : 2 * (th - 1 - k) + 1; }   // th > 0
 
 // Pixels [a, b) of a pattern row into screen row y: ragged nibble ends,
-// word copies between (both rows are word aligned).
+// word copies between (both rows are word aligned). gfx_copyRow does the
+// same, but through a flash wrapper on every row: 36 B more flash and
+// ~0.2 ms more per board redraw.
 RAMFUNC(isocopy) static void copyRow(int y, const uint8_t *src, int a, int b) {
     if (a < 0) a = 0;
     if (b > GFX_W) b = GFX_W;
@@ -67,10 +68,12 @@ RAMFUNC(isocopy) static void copyRow(int y, const uint8_t *src, int a, int b) {
 RAMFUNC(isopatspan) static void patSpan(uint8_t *row, int a, int b, uint8_t c) {
     if (a < 0) a = 0;
     if (b > GFX_W) b = GFX_W;
-    for (; a < b; a++) {
-        uint8_t &p = row[a >> 1];
-        p = (a & 1) ? (uint8_t)((p & 0x0F) | (c << 4)) : (uint8_t)((p & 0xF0) | c);
-    }
+    if (a >= b) return;
+    // Ragged nibble ends, whole bytes between.
+    if (a & 1) { row[a >> 1] = (uint8_t)((row[a >> 1] & 0x0F) | (c << 4)); a++; }
+    uint8_t *p = row + (a >> 1), *e = row + (b >> 1);
+    while (p < e) *p++ = (uint8_t)(c * 0x11);
+    if (b & 1) *e = (uint8_t)((*e & 0xF0) | c);
 }
 
 // The iso squares. The board is one big diamond (top corner x0, y0), and
@@ -123,16 +126,7 @@ static bool tileOnScreen(uint8_t sq, int &cx, int &top) {
     return cx + hw() > 0 && cx - hw() < GFX_W && top + 2 * hh() > 0 && top < GFX_H;
 }
 
-static inline void nib(int x, int y, uint8_t c) {
-    if ((unsigned)x >= GFX_W || (unsigned)y >= GFX_H) return;
-    uint8_t &b = gfx_fb[y * GFX_FB_STRIDE + (x >> 1)];
-    b = (x & 1) ? (uint8_t)((b & 0x0F) | (c << 4)) : (uint8_t)((b & 0xF0) | c);
-}
-
-RAMFUNC(isotint) static void tintSpan(int x0, int x1, int y, uint8_t c) {
-    for (int x = x0 + ((x0 + y) & 1); x < x1; x += 2) nib(x, y, c);
-}
-
+// Not solid: the checkerboard of pixels where x + y is even.
 void tileTint(uint8_t sq, uint8_t inset, uint8_t c, bool solid) {
     int cx, top;
     if (!tileOnScreen(sq, cx, top)) return;
@@ -141,7 +135,7 @@ void tileTint(uint8_t sq, uint8_t inset, uint8_t c, bool solid) {
         int a = cx + inset, b = cx + MW - inset;
         if (!flat) { int w = halfWidth(k, rows) - 2 * inset; a = cx - w; b = cx + w; }
         if (solid) gfx_hline(a, top + k, b - a, c);
-        else tintSpan(a, b, top + k, c);
+        else dither(a, top + k, b - a, 1, c, 0);
     }
 }
 
@@ -154,7 +148,7 @@ void tileBorder(uint8_t sq, uint8_t inset, uint8_t c, uint8_t c2, uint8_t phase)
         for (int side = 0; side < 4; side++) {
             int n = (side & 1) ? MH - 2 * inset - 1 : MW - 2 * inset - 1;
             for (int i = 0; i < n; i++, p++) {
-                nib(x, y, (p / 3) & 1 ? c2 : c);
+                gfx_pixel(x, y, (p / 3) & 1 ? c2 : c);
                 if (side & 1) y += side == 1 ? 1 : -1;
                 else          x += side == 0 ? 1 : -1;
             }

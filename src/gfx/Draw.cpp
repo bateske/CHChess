@@ -2,11 +2,7 @@
 #include <string.h>
 #include "Draw.h"
 #include "../fx/Fx.h"
-
-// Hot loops run from SRAM: from flash (3 wait states, no cache) a per-pixel
-// loop costs ~3 us a pixel on this part. Each gets its own section so the
-// unused ones are dropped at link time.
-#define RAMFUNC(name) __attribute__((section(".srodata.ramfunc." #name), noinline))
+#include "../RamFunc.h"     // hot loops run from SRAM
 
 static inline void plot(uint8_t *p, int x, uint8_t c) {
     if (x & 1) *p = (uint8_t)((*p & 0x0F) | (c << 4));
@@ -46,20 +42,23 @@ void roundRect(int x, int y, int w, int h, uint8_t r, uint8_t c) {
 }
 
 // A run of one colour within a row: odd nibble, whole bytes, odd nibble.
-static inline __attribute__((always_inline)) void fillRun(uint8_t *row, int a, int len, uint8_t c) {
+// pair is the colour in both nibbles.
+static inline __attribute__((always_inline)) void pairRun(uint8_t *row, int a, int len, uint8_t pair) {
     if (a < 0) { len += a; a = 0; }
     if (a + len > GFX_W) len = GFX_W - a;
     if (len <= 0) return;
     uint8_t *p = row + (a >> 1);
-    if (a & 1) { *p = (uint8_t)((*p & 0x0F) | (c << 4)); p++; len--; }
-    uint8_t cc = (uint8_t)(c | (c << 4));
-    while (len >= 2) { *p++ = cc; len -= 2; }
-    if (len) *p = (uint8_t)((*p & 0xF0) | c);
+    if (a & 1) { *p = (uint8_t)((*p & 0x0F) | (pair & 0xF0)); p++; len--; }
+    uint8_t *e = p + (len >> 1);
+    while (p < e) *p++ = pair;
+    if (len & 1) *p = (uint8_t)((*p & 0xF0) | (pair & 0x0F));
 }
 
 RAMFUNC(sprite4) void sprite4(const uint8_t *d, int x, int y, const uint8_t *remap, int scale) {
     uint8_t h = d[1];
     d += 2;
+    uint8_t pair[15];                       // remapped colours, doubled (remap < 16)
+    for (int i = 0; i < 15; i++) pair[i] = (uint8_t)(remap[i] * 0x11);
     for (int j = 0; j < h; j++) {
         uint8_t n = *d++;
         const uint8_t *runs = d;
@@ -72,7 +71,7 @@ RAMFUNC(sprite4) void sprite4(const uint8_t *d, int x, int y, const uint8_t *rem
             for (uint8_t i = 0; i < n; i++) {
                 uint8_t b = runs[i];
                 int len = (b >> 4) + 1;
-                if ((b & 15) != 15) fillRun(row, q, len, remap[b & 15]);
+                if ((b & 15) != 15) pairRun(row, q, len, pair[b & 15]);
                 q += len;
             }
             continue;
@@ -89,7 +88,7 @@ RAMFUNC(sprite4) void sprite4(const uint8_t *d, int x, int y, const uint8_t *rem
                 int len = (b >> 4) + 1;
                 if ((b & 15) != 15) {
                     int a = x + ((px * scale) >> 8);
-                    fillRun(row, a, x + (((px + len) * scale) >> 8) - a, remap[b & 15]);
+                    pairRun(row, a, x + (((px + len) * scale) >> 8) - a, pair[b & 15]);
                 }
                 px += len;
             }
@@ -115,7 +114,7 @@ void spriteRot(const uint8_t *d, int ax, int ay, int px, int py, uint8_t angle, 
     if (stride * h > 1024 || scale <= 0) return;
     // Decode to raw 4 bpp (15 = transparent).
     uint8_t *buf = gfx_chunkScratch();
-    for (int i = 0; i < stride * h; i++) buf[i] = 0xFF;
+    memset(buf, 0xFF, stride * h);
     const uint8_t *p = d + 2;
     for (int j = 0; j < h; j++) {
         uint8_t n = *p++;
@@ -133,12 +132,16 @@ void spriteRot(const uint8_t *d, int ax, int ay, int px, int py, uint8_t angle, 
     // Inverse map: screen offset (dx, dy) from the pivot -> source pixel.
     int cs = fx::isin(angle + 64), sn = fx::isin(angle);            // Q8
     int32_t ic = (int32_t)cs * 256 / scale, is = (int32_t)sn * 256 / scale;   // Q8, divided by scale
-    // Bounding box: the pivot's farthest corner distance, scaled.
-    int r = 0;
-    int cx[4] = {-ax, w - ax, -ax, w - ax}, cy[4] = {-ay, -ay, h - ay, h - ay};
-    for (int k = 0; k < 4; k++) { int m = (cx[k] < 0 ? -cx[k] : cx[k]) + (cy[k] < 0 ? -cy[k] : cy[k]); if (m > r) r = m; }
-    r = r * scale / 256 + 1;
-    int y0 = py - r, y1 = py + r, x0 = px - r, x1 = px + r;
+    // rotSpan draws (dx, dy) from the pivot only where ic*dx + is*dy is in
+    // [-256ax - 128, 256(w - ax) - 128) and ic*dy - is*dx in [-256ay - 128,
+    // 256(h - ay) - 128): a parallelogram, centre (cx, cy) / D and half-size
+    // (ex, ey) / D. Visit just its box, not the square round the pivot.
+    int32_t D = ic * ic + is * is, mA = 128 * (w - 2 * ax - 1), mB = 128 * (h - 2 * ay - 1);
+    int32_t aic = ic < 0 ? -ic : ic, ais = is < 0 ? -is : is;
+    int32_t cx = ic * mA - is * mB, ex = 128 * (aic * w + ais * h);
+    int32_t cy = is * mA + ic * mB, ey = 128 * (ais * w + aic * h);
+    int x0 = px + (int)((cx - ex) / D), x1 = px + (int)((cx + ex) / D) + 1;
+    int y0 = py + (int)((cy - ey) / D), y1 = py + (int)((cy + ey) / D) + 1;
     if (y0 < 0) y0 = 0;
     if (y1 > GFX_H) y1 = GFX_H;
     if (x0 < 0) x0 = 0;
@@ -155,43 +158,6 @@ void spriteRot(const uint8_t *d, int ax, int ay, int px, int py, uint8_t angle, 
 // ---------------------------------------------------------------------------
 // Shapes and effects
 // ---------------------------------------------------------------------------
-static int isqrt(int v) {
-    if (v <= 0) return 0;
-    int r = 0, bit = 1 << 14;
-    while (bit > v) bit >>= 2;
-    while (bit) {
-        if (v >= r + bit) { v -= r + bit; r = (r >> 1) + bit; }
-        else r >>= 1;
-        bit >>= 2;
-    }
-    return r;
-}
-
-// Half-widths per row for the few ellipse sizes in use (bet circle, chips),
-// computed once: the integer square roots cost ~10 us a row from flash.
-struct EllipseRows { uint8_t rx, ry, dx[16]; };
-static EllipseRows ecache[4];
-
-static const uint8_t *ellipseRows(int rx, int ry) {
-    for (auto &e : ecache) if (e.rx == rx && e.ry == ry) return e.dx;
-    static uint8_t next = 0;
-    EllipseRows &e = ecache[next++ & 3];
-    e.rx = (uint8_t)rx; e.ry = (uint8_t)ry;
-    for (int dy = 0; dy <= ry && dy < 16; dy++) {
-        int t = ry * ry - dy * dy + ry / 2;
-        e.dx[dy] = (uint8_t)(ry > 0 ? isqrt(rx * rx * t / (ry * ry)) : rx);
-    }
-    return e.dx;
-}
-
-void fillEllipse(int cx, int cy, int rx, int ry, uint8_t c) {
-    const uint8_t *dx = ellipseRows(rx, ry);
-    for (int dy = -ry; dy <= ry; dy++) {
-        int d = dx[dy < 0 ? -dy : dy];
-        gfx_hline(cx - d, cy + dy, 2 * d + 1, c);
-    }
-}
-
 void dither(int x, int y, int w, int h, uint8_t c, uint8_t phase) {
     if (x < 0) { w += x; x = 0; }
     if (y < 0) { h += y; y = 0; }
@@ -206,23 +172,15 @@ void dither(int x, int y, int w, int h, uint8_t c, uint8_t phase) {
         uint8_t m = ((yy + phase) & 1) ? 0xF0 : 0x0F;
         int i = x;
         if (i & 1) { if (m == 0xF0) row[i >> 1] = (uint8_t)((row[i >> 1] & 0x0F) | (c << 4)); i++; }
-        for (; i + 1 < x + w; i += 2) row[i >> 1] = (uint8_t)((row[i >> 1] & ~m) | (cc & m));
-        if (i < x + w && m == 0x0F) row[i >> 1] = (uint8_t)((row[i >> 1] & 0xF0) | c);
-    }
-}
-
-void remapRect(int x, int y, int w, int h, const uint8_t *m) {
-    if (x < 0) { w += x; x = 0; }
-    if (y < 0) { h += y; y = 0; }
-    if (x + w > GFX_W) w = GFX_W - x;
-    if (y + h > GFX_H) h = GFX_H - y;
-    if (w <= 0 || h <= 0) return;
-    for (int j = 0; j < h; j++) {
-        uint8_t *row = gfx_fb + (y + j) * GFX_FB_STRIDE;
-        int i = x;
-        if (i & 1) { uint8_t b = row[i >> 1]; row[i >> 1] = (uint8_t)((b & 0x0F) | (m[b >> 4] << 4)); i++; }
-        for (; i + 1 < x + w; i += 2) { uint8_t b = row[i >> 1]; row[i >> 1] = (uint8_t)(m[b & 15] | (m[b >> 4] << 4)); }
-        if (i < x + w) { uint8_t b = row[i >> 1]; row[i >> 1] = (uint8_t)((b & 0xF0) | m[b & 15]); }
+        // Whole bytes [p, e): a word (8 px) at a time from each aligned one.
+        uint8_t *p = row + (i >> 1), *e = row + ((x + w) >> 1);
+        uint32_t m32 = m * 0x01010101u, c32 = (cc & m) * 0x01010101u;
+        while (p < e) {
+            if (!((uintptr_t)p & 3))
+                for (; p + 4 <= e; p += 4) *(uint32_t *)p = (*(uint32_t *)p & ~m32) | c32;
+            if (p < e) { *p = (uint8_t)((*p & ~m) | (cc & m)); p++; }
+        }
+        if (((x + w) & 1) && m == 0x0F) *e = (uint8_t)((*e & 0xF0) | c);
     }
 }
 
